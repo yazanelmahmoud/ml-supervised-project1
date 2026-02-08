@@ -24,7 +24,7 @@ Number of leaves: 121
 
 --- Best from each model-complexity curve (other params at standard) ---
   ccp_alpha curve (max_depth=None, min_samples_leaf=1):
-    best ccp_alpha=0.000100, CV F1=0.6834
+    best ccp_alpha=0.000100, CV F1=0.6833
   max_depth curve (ccp_alpha=0, min_samples_leaf=1):
     best max_depth=12, CV F1=0.6672
   min_samples_leaf curve (ccp_alpha=0, max_depth=None):
@@ -32,7 +32,7 @@ Number of leaves: 121
 
 --- Grid-search best (joint tuning, val F1) ---
 CV F1: 0.6836
-Params: {'ccp_alpha': 0.0001, 'max_depth': 30, 'min_samples_leaf': 1}
+Params: {'ccp_alpha': 9.999999999999999e-05, 'max_depth': 30, 'min_samples_leaf': 1}
 
 --- Test metrics ---
 Accuracy:  0.8590
@@ -44,9 +44,9 @@ TN=6425  FP=370
 FN=904  TP=1336
 
 --- Runtime ---
-Fit (sec):    0.2083
-Predict (sec): 0.0018
-Hardware: Windows 10, CPU: Intel64 Family 6 Model 140 Stepping 1, GenuineIntel
+Fit (sec):    0.1467
+Predict (sec): 0.0011
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 
 --- Note ---
 Revisit hypothesis from hypothesis.txt in DT conclusions.
