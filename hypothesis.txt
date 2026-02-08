@@ -1,0 +1,39 @@
+================================================================================
+  HYPOTHESIS — ADULT INCOME (CENSUS) DATASET
+================================================================================
+
+We hypothesize that model performance will strongly depend on how well each
+algorithm's inductive bias aligns with the structural characteristics of the
+Adult Income dataset. The dataset exhibits moderate class imbalance (3:1 ratio),
+mixed-type features (6 numeric, 8 categorical with varying cardinality), and
+strong non-linear interaction effects between categorical features (e.g.,
+education × occupation, marital-status × sex).
+
+Given these characteristics, we expect Decision Trees to perform well because
+they naturally capture non-linear interactions and categorical splits without
+requiring extensive preprocessing. Pruned, moderately shallow trees should
+generalize best by avoiding overfitting while still capturing key decision
+boundaries. Linear SVMs are expected to perform moderately well due to the
+dataset's moderate dimensionality after encoding, but may struggle with
+non-linear interactions unless feature engineering captures them. RBF SVMs
+should outperform linear SVMs by capturing non-linear relationships, though
+they may require careful regularization given the moderate imbalance.
+
+We expect kNN to perform poorly because the dataset becomes high-dimensional
+after one-hot encoding low/moderate-cardinality categorical features (workclass,
+marital-status, occupation, relationship, race, sex), leading to distance
+concentration effects where all points become equidistant. Additionally, kNN struggles with mixed-type data and
+categorical features that don't have meaningful distance metrics.
+
+Neural Networks (shallow-wide architectures with strong regularization) are
+expected to perform well by learning non-linear feature interactions through
+hidden layers, but deep-narrow networks risk overfitting on this tabular data
+without sufficient width or regularization. The moderate class imbalance
+necessitates class weighting or balanced sampling strategies for SVMs and NNs.
+
+In summary, we expect the ranking: Decision Trees ≈ RBF SVMs ≈ Shallow-Wide NNs
+> Linear SVMs > kNN, with performance gaps driven by how well each method handles
+non-linear categorical interactions, moderate imbalance, and high-dimensional
+encoded feature space.
+
+================================================================================

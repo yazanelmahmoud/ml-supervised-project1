@@ -1,0 +1,94 @@
+Supervised Learning 
+Dataset A: Adult Income (Census Income) • Task type: Binary classification • Target: income (≤ 50K vs > 50K) • Notes: Expect class imbalance (∼ 3:1). The dataset is largely one-hot/binary encoded with a small continuous subset. • Required evaluation metrics: F1 and Accuracy (minimum), plus PR-AUC when reporting thresholdbased results (because imbalance makes accuracy insufficient).
+
+Examples of the first lines of data : 
+age,workclass,fnlwgt,education,education-num,marital-status,occupation,relationship,race,sex,capital-gain,capital-loss,hours-per-week,native-country,class
+25.0,Private,226802.0,11th,7.0,Never-married,Machine-op-inspct,Own-child,Black,Male,0.0,0.0,40.0,United-States,<=50K
+38.0,Private,89814.0,HS-grad,9.0,Married-civ-spouse,Farming-fishing,Husband,White,Male,0.0,0.0,50.0,United-States,<=50K
+28.0,Local-gov,336951.0,Assoc-acdm,12.0,Married-civ-spouse,Protective-serv,Husband,White,Male,0.0,0.0,40.0,United-States,>50K
+44.0,Private,160323.0,Some-college,10.0,Married-civ-spouse,Machine-op-inspct,Husband,Black,Male,7688.0,0.0,40.0,United-States,>50K
+
+Do the EDA 
+Develop hypotheses : Propose at least one clear hypothesis about expected algorithmic performance before running full tuning and final experiments. These hypotheses must be grounded in theory from the lectures and readings (e.g., bias–variance, margin-based classifiers, sensitivity to scaling, curse of dimensionality, capacity/regularization, and effects of class imbalance). Your experiments and discussion should be structured around testing these hypotheses, not merely reporting results
+
+Your hypotheses should make a concrete prediction (what model family should do well and why)
+
+After you do this, you start the experiments : 
+ train and tune four algorithms 
+After you do this, you start the Interpretation : 
+ write a thorough analysis of your findings.
+Your analysis should explicitly evaluate whether the results support or contradict your prediction (Hypothesis). 
+
+A strong hypothesis includes: 
+ a predicted ordering or trade-off (e.g., Linear SVM ≥ DT ≥ kNN),
+ a reason tied to dataset properties observed in EDA (e.g., sparsity, separability, imbalance, noise), and 
+ a theory-based explanation (e.g., margin maximization, regularization, bias–variance, locality effects). Avoid generic claims that cannot be tested
+
+ Required Algorithms
+
+• Decision Trees (DT). Use some form of pruning/regularization (e.g., post-pruning via ccp α, depth
+limits, leaf constraints). You are not required to use information gain. Gini or entropy are fine. State
+what you use and why.
+• k-Nearest Neighbors (kNN). Compare meaningfully different values of k (e.g., small/medium/large)
+and justify your choice.
+• Support Vector Machines (SVM). Evaluate ≥ 2 kernels per dataset (e.g., linear vs. RBF) and tune
+C and γ (where relevant).
+• Neural Networks (MLP; SGD only). You must train two neural network implementations 
+– One scikit-learn model: MLPClassifier using SGD only.
+– One PyTorch model: a compact MLP trained with SGD only.
+You will compare capacity scaling (depth vs. width) while keeping SGD constant, and you must hold
+the total parameter count approximately constant when comparing architectures. No momentum, no
+Nesterov, and no adaptive variants such as Adam/Adagrad/RMSprop are allowed. Report
+learning rate, batch size, epochs/early stopping, and regularization choices.
+
+
+Required Workflow Outputs (per algorithm) 
+
+Applies for each required algorithm component (DT, kNN, SVM, and NN-Sklearn & NN-PyTorch).
+
+Data, targets, and leakage controls
+• Declare the target, the task type, and justify your chosen metrics.
+• Report the class distribution and describe how imbalance affects your evaluation.
+• State leakage controls you applied (what you removed, what you verified, and why).
+• Use a single held-out test split once at the end. Perform tuning using cross-validation (or a train/validation
+split) on the training data only.
+• State at least one dataset-specific hypothesis before presenting tuned results, and explicitly revisit it in
+your conclusions.
+Methodology & reproducibility
+• Fix random seeds, record exact splits, and make preprocessing deterministic.
+• Provide sufficient instructions to reproduce your results on a standard Linux machine.
+
+Per-algorithm required figures/tables
+• Learning curves (LC): training and validation metric vs. training size. Diagnose bias/variance.
+• Model-complexity curves (MC): validation metric vs. one hyperparameter (e.g., NN width/L2; SVM C/γ; kNN k; DT depth/ccp α).
+• Runtime table: fit and predict wall-clock times with a brief hardware note.
+• Classification add-ons: confusion matrix at a justified operating point; per-class discussion for multiclass results.
+Algorithm-specific essentials
+• NN (both implementations): show epoch-based learning curves (train vs. validation loss/metric) and
+discuss early stopping and regularization.
+• NN comparison requirement: explicitly compare scikit-learn vs. PyTorch results and discuss differences in optimization behavior, stability, runtime, and tunability under SGD-only constraints.
+• SVM: scale features; use ≥ 2 kernels per dataset; tune C and kernel parameters.
+• kNN: scale features; justify distance metric and weighting; discuss sensitivity to irrelevant features and
+high dimensionality.
+• DT: show a pruning/regularization curve and report final depth and number of leaves.
+
+Cross-model comparison (discussion required)
+Compare across algorithms and datasets with evidence-backed trade-offs: metric vs. wall-clock, stability vs.capacity, sensitivity to hyperparameters, and effect of preprocessing. Tie conclusions to course concepts.
+
+Conclusion (required)
+Discuss:
+• Type I/II errors in the context of your operating point (classification),
+• what you learned about model behavior on each dataset, and
+• one realistic next step.
+
+NB : Your analysis and conclusions must be written in paragraphs with coherent reasoning. Excessive bullet-only writing that replaces interpretation (especially in Results/Discussion) will be treated as a draft and scored accordingly
+
+
+
+10 Acceptable Libraries
+
+Recommended stack (examples)
+• Core ML: scikit-learn (pipelines, cross-validation, metrics, calibration), imbalanced-learn (imbalance utilities), PyTorch (required).
+• Data & plotting: pandas, polars, NumPy, and matplotlib (or plotly/altair/seaborn).
+Neural network optimizer rule (required)
+For all neural network experiments, you must use SGD only. Momentum, Nesterov acceleration, and adaptive optimizers (Adam/Adagrad/RMSprop/etc.) are not allowed

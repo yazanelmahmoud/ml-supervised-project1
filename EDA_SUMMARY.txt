@@ -1,0 +1,223 @@
+================================================================================
+  EDA SUMMARY & PREPROCESSING NOTES
+  Adult Income (Census) Dataset
+================================================================================
+
+This file documents findings from exploratory data analysis (EDA), data quality
+checks, and preprocessing decisions.
+
+--------------------------------------------------------------------------------
+DATASET OVERVIEW & KEY OBSERVATIONS
+--------------------------------------------------------------------------------
+
+The Adult Income dataset contains 45,175 census records (15 columns) to predict
+income classification (<=50K vs >50K) [1]. After removing 47 exact duplicate rows
+to prevent data leakage, the dataset comprises 6 numeric and 8 categorical
+features plus the binary target. The target exhibits moderate class imbalance
+(75.2% <=50K vs 24.8% >50K, ratio ~3:1), which necessitates careful metric
+selection beyond accuracy—F1 and PR-AUC are essential for threshold-based
+evaluation.
+
+A critical finding is the perfect one-to-one correspondence between education
+and education-num (16 unique levels, ranging from Preschool=1.0 to Doctorate=16.0).
+This redundancy means one feature can be dropped without information loss;
+education-num is preferred for modeling due to its ordinal nature and direct
+numeric representation. The dataset contains no missing values after treating
+'?' markers as NaN in object columns, simplifying preprocessing.
+
+The numeric features show diverse distributions: age (mean=38.6, std=13.2) and
+hours-per-week (mean=40.9, std=12.0) are approximately normal, while capital-gain
+and capital-loss are highly zero-inflated (medians=0, with extreme outliers up
+to 99,999 and 4,356 respectively). The fnlwgt (final weight) feature exhibits
+near-zero correlation with the target (-0.0072) and is a sampling weight
+artifact; we drop it in preprocessing to reduce dimensionality.
+
+Categorical features vary widely in cardinality: binary (sex, 2 levels), low
+(race, 5 levels; relationship, 6 levels), moderate (workclass, 7 levels;
+marital-status, 7 levels; occupation, 14 levels), and high (native-country, 41
+levels; education, 16 levels). The high-cardinality native-country feature is
+dominated by United-States (91.3% of records), with 40 other countries having
+sparse representation (many <100 records). This sparsity suggests target encoding (fit on training set only, then applied
+to test set to avoid leakage) rather than one-hot encoding for native-country
+to avoid excessive dimensionality.
+
+--------------------------------------------------------------------------------
+DUPLICATE REMOVAL
+--------------------------------------------------------------------------------
+
+Date: 2026-02-06
+
+Decision: Remove exact duplicate rows (all columns including target)
+
+Rationale:
+- Prevents data leakage: exact duplicates could end up in both train and test sets
+- Avoids overfitting: models might memorize repeated instances
+- Improves reproducibility: consistent dataset for all experiments
+
+Findings:
+- Initial dataset size: 45,222 rows
+- Exact duplicates (all columns): 47 rows
+- Feature duplicates (excluding target): 52 rows
+- Final dataset size after removal: 45,175 rows
+
+Implementation:
+- Duplicates removed automatically in data_loading.py::load_adult()
+- Uses pandas drop_duplicates(keep='first') to keep first occurrence
+- Removal happens before any train/test split
+
+Note: Feature-only duplicates (52 cases) are kept as they represent different
+      individuals with same demographics but potentially different income outcomes.
+
+--------------------------------------------------------------------------------
+MISSING VALUES
+--------------------------------------------------------------------------------
+
+After treating '?' markers as NaN in object columns, the dataset contains zero
+missing values across all features. This clean state eliminates the need for
+imputation strategies, simplifying the preprocessing pipeline. All numeric columns
+are complete (age, fnlwgt, education-num, capital-gain, capital-loss,
+hours-per-week), and all categorical columns have valid entries.
+
+--------------------------------------------------------------------------------
+DATA TYPES & ENCODING STRATEGY
+--------------------------------------------------------------------------------
+
+Numeric features (6): age, fnlwgt, education-num, capital-gain, capital-loss,
+hours-per-week. All stored as float64; can be cast to float32 for memory
+efficiency. Capital-gain and capital-loss require robust scaling (StandardScaler
+or RobustScaler) due to extreme outliers; other numerics benefit from
+standardization for distance-based methods (kNN, SVM).
+
+Categorical features (8): workclass (7), education (16), marital-status (7),
+occupation (14), relationship (6), race (5), sex (2), native-country (41).
+Encoding strategy:
+- Low-cardinality (<10 levels): one-hot encoding (workclass, marital-status,
+  relationship, race, sex)
+- Moderate-cardinality (10-20 levels): one-hot encoding (education, occupation)
+- High-cardinality (>20 levels): target encoding (native-country, 41 levels
+  with heavy sparsity); fit on training set only, then apply to test set to
+  avoid leakage
+
+Education vs education-num: Drop education (string) and retain education-num
+(ordinal numeric) to avoid redundancy and leverage ordinality.
+
+--------------------------------------------------------------------------------
+FEATURE ANALYSIS & IMPLICATIONS
+--------------------------------------------------------------------------------
+
+Target Correlations (numeric features):
+- education-num: 0.333 (strongest predictor, ordinal relationship)
+- age: 0.237 (positive, experience/earnings relationship)
+- hours-per-week: 0.227 (work intensity indicator)
+- capital-gain: 0.221 (wealth indicator, sparse but informative)
+- capital-loss: 0.149 (moderate, also sparse)
+- fnlwgt: -0.007 (negligible, dropped)
+
+The strong correlation of education-num aligns with economic theory: higher
+education typically correlates with higher income. Age shows a positive
+relationship, consistent with career progression and accumulated experience.
+Hours-per-week reflects work intensity, which naturally associates with income
+levels. Capital-gain and capital-loss, despite sparsity, provide signal about
+wealth accumulation patterns.
+
+Categorical associations reveal strong patterns:
+- Marital status: Married-civ-spouse (45.4% >50K) vs Never-married (4.8% >50K)
+  suggests dual-income households and stability effects
+- Occupation: Exec-managerial (47.9%) and Prof-specialty (45.0%) show highest
+  rates, while Priv-house-serv (1.3%) and Other-service (4.1%) are lowest
+- Sex: Male (31.3%) vs Female (11.4%) reflects historical wage disparities
+- Education: Prof-school (75.4%) and Doctorate (73.4%) show strongest
+  associations, while Preschool (1.4%) and early grades (<5%) are minimal
+
+These associations suggest that models should capture interaction effects
+(e.g., education × occupation, marital-status × sex) and that tree-based
+methods may excel at discovering these non-linear relationships.
+
+--------------------------------------------------------------------------------
+TARGET DISTRIBUTION & IMBALANCE CONSIDERATIONS
+--------------------------------------------------------------------------------
+
+Class distribution: <=50K (33,973, 75.2%) vs >50K (11,202, 24.8%), imbalance
+ratio 3.03:1. This moderate imbalance requires:
+- Metrics: F1-score (harmonic mean of precision/recall) and PR-AUC (area under
+  precision-recall curve) are essential; accuracy alone is misleading
+- Sampling: Consider class_weight='balanced' or SMOTE for algorithms sensitive
+  to imbalance (SVM, some neural networks)
+- Threshold tuning: Operating point selection based on PR-curve or F1
+  optimization rather than default 0.5 threshold
+
+The imbalance is moderate enough that most algorithms can handle it with
+appropriate class weighting, but severe enough that threshold-based evaluation
+is critical.
+
+--------------------------------------------------------------------------------
+PREPROCESSING PIPELINE DECISIONS
+--------------------------------------------------------------------------------
+
+1. Feature removal:
+   - Drop education (string) → keep education-num (ordinal numeric)
+   - Drop fnlwgt (near-zero correlation with target, sampling weight artifact)
+
+2. Encoding:
+   - One-hot encode: workclass, marital-status, relationship, race, sex,
+     occupation, education-num (treated as categorical for encoding)
+   - Target encoding for native-country (high cardinality, sparse): fit on
+     training set only, then apply the learned mapping to the test set to
+     avoid leakage
+
+3. Scaling:
+   - StandardScaler for all numeric features (required for kNN, SVM)
+   - RobustScaler alternative for capital-gain/loss if outliers problematic
+
+4. Data types:
+   - Cast numerics to float32 for memory efficiency
+   - Target: int32 (0/1 encoding)
+
+5. Train/test split:
+   - Single held-out test split (fixed random seed)
+   - Stratified split to preserve class distribution
+   - Cross-validation on training set only for hyperparameter tuning
+
+--------------------------------------------------------------------------------
+REPORT PARAGRAPH SECTION
+--------------------------------------------------------------------------------
+
+The Adult Income dataset contains 45,175 census records (15 columns) to predict
+income classification (<=50K vs >50K) [1]. We remove 47 exact duplicate rows to
+prevent data leakage. The dataset has no missing values after treating '?' as
+NaN. The target exhibits moderate class imbalance (75.2% vs 24.8%, ratio ~3:1),
+necessitating F1 and PR-AUC metrics alongside accuracy.
+
+We drop the education string column, retaining education-num (ordinal, 1-16) due
+to perfect one-to-one correspondence. We drop the fnlwgt column because of its
+near-zero correlation with the target (-0.0072) and because it is a sampling
+weight artifact with no predictive value. Final schema: 5 numeric features (age,
+education-num, capital-gain, capital-loss, hours-per-week) and 8 categorical
+features (workclass, marital-status, occupation, relationship, race, sex,
+native-country, plus education-num treated categorically for encoding).
+Native-country is high-cardinality (41 levels) with heavy sparsity (United-States
+dominates at 91.3%); we use target encoding rather than one-hot to avoid
+excessive dimensionality. Target encoding for native-country is fit only on the
+training set and then applied to the test set (using the mapping learned from
+training) to avoid data leakage.
+
+Missingness is zero across all features. Numeric features show diverse
+distributions: capital-gain and capital-loss are highly zero-inflated with
+extreme outliers (max 99,999 and 4,356), while age and hours-per-week are
+approximately normal. Strongest target correlations: education-num (0.333), age
+(0.237), hours-per-week (0.227). Categorical associations reveal strong patterns:
+Married-civ-spouse (45.4% >50K) vs Never-married (4.8%), Exec-managerial (47.9%)
+vs Priv-house-serv (1.3%), Male (31.3%) vs Female (11.4%), Prof-school (75.4%)
+vs Preschool (1.4%).
+
+The preprocessing pipeline (fit on training set only, then applied to test set to avoid leakage) 
+applies one-hot encoding to low/moderate-cardinalitycategoricals (<20 levels), 
+target encoding to native-country, standardizes all numeric
+features (required for kNN and SVM), and casts numerics to float32 (target
+int32). The same preprocessing is applied to all models on the full dataset,
+with a single stratified train/test split (fixed seed) and cross-validation on
+training data only for hyperparameter tuning.
+
+NB : Talk about correlations and about log transform for capital loss gain. 
+
+================================================================================

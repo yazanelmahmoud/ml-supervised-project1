@@ -1,0 +1,40 @@
+============================================================
+k-NEAREST NEIGHBORS — RESULTS (Adult Income)
+============================================================
+
+--- Model-complexity: weights × metric (CV F1 vs k) ---
+k_values: [3, 5, 10, 15, 20, 25, 30, 40, 50]
+
+  weights=uniform, metric=euclidean: [0.6359, 0.6472, 0.6398, 0.6636, 0.6543, 0.664, 0.6543, 0.6589, 0.6582]
+  weights=uniform, metric=manhattan: [0.6326, 0.6442, 0.6356, 0.6594, 0.6493, 0.6592, 0.6484, 0.6485, 0.6487]
+  weights=distance, metric=euclidean: [0.6258, 0.6328, 0.6419, 0.6467, 0.6482, 0.6494, 0.6502, 0.6502, 0.6505]
+  weights=distance, metric=manhattan: [0.6207, 0.6263, 0.6376, 0.6441, 0.6422, 0.6429, 0.6435, 0.6443, 0.6421]
+
+CV F1 at k=20:
+  weights=uniform, metric=euclidean: 0.6543
+  weights=uniform, metric=manhattan: 0.6493
+  weights=distance, metric=euclidean: 0.6482
+  weights=distance, metric=manhattan: 0.6422
+Best (k, weights, metric): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
+best_cv_f1: 0.6640
+
+============================================================
+--- Learning curves ---
+train_sizes: [2891, 5782, 8673, 11564, 14456, 17347, 20238, 23129, 26020, 28912]
+baseline (k=5, uniform, euclidean):
+  train_f1_mean: [0.7619, 0.7527, 0.7484, 0.7486, 0.7463, 0.7443, 0.7467, 0.7474, 0.7471, 0.7471]
+  val_f1_mean: [0.6344, 0.6328, 0.6355, 0.641, 0.6405, 0.6444, 0.6461, 0.6455, 0.6465, 0.6472]
+tuned (best_config from Step 1): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
+  train_f1_mean: [0.6813, 0.6725, 0.6773, 0.6847, 0.6833, 0.682, 0.6858, 0.6817, 0.683, 0.6859]
+  val_f1_mean: [0.6383, 0.6418, 0.6493, 0.653, 0.655, 0.6566, 0.661, 0.6575, 0.661, 0.664]
+--- Test evaluation ---
+best_config (from Step 1): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
+Accuracy: 0.8444
+F1: 0.6594
+PR-AUC: 0.7420
+Fit (sec): 0.0023
+Predict (sec): 1.6654
+Hardware: Windows 10, CPU: Intel64 Family 6 Model 140 Stepping 1, GenuineIntel
+Confusion matrix (0=<=50K, 1=>50K): [[6268, 527], [879, 1361]]
+
+============================================================
