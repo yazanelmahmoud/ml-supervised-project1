@@ -37,9 +37,9 @@ Select the best width.
 STEP 2 — DEPTH VS WIDTH (KEEP PARAM COUNT APPROX CONSTANT)
 
 Test architectures:
-- [256]         — Wide shallow baseline
-- [128, 128]    — Balanced depth
-- [64, 64, 64]  — Deeper but narrower
+- [64]         — Wide shallow baseline
+- [32, 32]    — Balanced depth
+- [16, 16, 16, 16]  — Deeper but narrower
 
 Keep fixed:
 - LR = 0.01
@@ -82,28 +82,12 @@ Select best LR.
 
 --------------------------------------------------
 
-STEP 4 — L2 REGULARIZATION
 
-Use best architecture + LR.
-
-Test:
-[0, 1e-5, 1e-4, 1e-3, 1e-2]
-
-PLOT:
-- Model Complexity Curve
-    X-axis: L2
-    Y-axis: training + validation score
-
-Select best L2.
-
---------------------------------------------------
-
-STEP 5 — FINAL MODEL
+STEP 4 — FINAL MODEL
 
 Retrain using:
 - best architecture
 - best LR
-- best L2
 
 Generate:
 

@@ -6,6 +6,25 @@ Binary classification: predict income **<=50K** vs **>50K**. Class imbalance ~3:
 
 ---
 
+## Environment setup
+
+### Option A: pip (venv)
+```bash
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Option B: conda
+```bash
+conda env create -f environment.yml
+conda activate ml-project1
+```
+
+Then run the notebook: `jupyter notebook project1_results.ipynb` (or open in VS Code/Cursor).
+
+---
+
 ## Data & Config (don’t forget)
 
 - **Data file:** `adult.csv` (path in `config.DATA_PATH`).

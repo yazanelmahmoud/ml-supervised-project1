@@ -7,10 +7,13 @@ Compare capacity scaling (depth vs width) with ~constant parameter count.
 """
 
 import os
+import time
+from collections import defaultdict
 import numpy as np
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import f1_score
+from sklearn.model_selection import StratifiedKFold, learning_curve
+from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, average_precision_score
+from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -20,9 +23,9 @@ from config import RANDOM_SEED, OUTPUT_DIR
 NN_SKLEARN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NN_sklearn_results.txt")
 
 # Step 1 — Width search (NN_strategy.txt)
-WIDTH_VALUES = [8, 16, 32, 64, 128, 256, 512]
-# Step 2 — Depth vs width: [256], [128,128], [64,64,64]
-STEP2_ARCHITECTURES = [(256,), (128, 128), (64, 64, 64)]
+WIDTH_VALUES = [8, 16, 32, 64, 128]
+# Step 2 — Depth vs width: [64], [32,32], [16,16,16,16]
+STEP2_ARCHITECTURES = [(64,), (32, 32), (16, 16, 16, 16)]
 # Step 3 — LR sweep
 STEP3_LR_VALUES = [0.1, 0.01, 0.001, 0.0003]
 
@@ -32,6 +35,40 @@ BATCH_SIZE = 64
 MAX_EPOCHS = 100
 EARLY_STOPPING_PATIENCE = 10
 CV_SPLITS = 5
+N_JOBS = -1  # Use all CPU cores for parallel CV
+
+
+def _fit_one_fold_width(w, max_iter, train_idx, val_idx, X_train, y_train):
+    """Fit one (width, fold); return (train_f1, val_f1). Picklable for joblib."""
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    clf = _make_mlp((w,), max_iter=max_iter)
+    clf.fit(X_tr, y_tr)
+    return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
+
+
+def _fit_one_fold_arch(arch, max_iter, train_idx, val_idx, X_train, y_train):
+    """Fit one (arch, fold); return (train_f1, val_f1). Picklable for joblib."""
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    clf = _make_mlp(arch, max_iter=max_iter)
+    clf.fit(X_tr, y_tr)
+    return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
+
+
+def _fit_one_fold_lr(arch, lr, max_iter, train_idx, val_idx, X_train, y_train):
+    """Fit one (lr, fold); return (train_f1, val_f1). Picklable for joblib."""
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    clf = _make_mlp(arch, learning_rate_init=lr, max_iter=max_iter)
+    clf.fit(X_tr, y_tr)
+    return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
 
 
 def _append_nn_results(text):
@@ -83,21 +120,27 @@ def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
     n_samples = X_train.shape[0]
     max_iter = _get_max_iter(n_samples)
 
-    train_f1_list = []
-    cv_f1_list = []
-
-    for w in tqdm(WIDTH_VALUES, desc="NN width sweep"):
-        fold_train_f1 = []
-        fold_val_f1 = []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            X_tr, X_val = X_train[train_idx], X_train[val_idx]
-            y_tr, y_val = y_train[train_idx], y_train[val_idx]
-            clf = _make_mlp((w,), max_iter=max_iter)
-            clf.fit(X_tr, y_tr)
-            fold_train_f1.append(f1_score(y_tr, clf.predict(X_tr), zero_division=0))
-            fold_val_f1.append(f1_score(y_val, clf.predict(X_val), zero_division=0))
-        train_f1_list.append(float(np.mean(fold_train_f1)))
-        cv_f1_list.append(float(np.mean(fold_val_f1)))
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (w, max_iter, train_idx, val_idx)
+        for w in WIDTH_VALUES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_width)(w, max_iter, train_idx, val_idx, X_train, y_train)
+        for w, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN width sweep", total=len(tasks))
+    )
+    # Aggregate by width (same order as WIDTH_VALUES)
+    by_width = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for w in WIDTH_VALUES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_width[w]["train"].append(train_f1)
+            by_width[w]["val"].append(val_f1)
+            idx += 1
+    train_f1_list = [float(np.mean(by_width[w]["train"])) for w in WIDTH_VALUES]
+    cv_f1_list = [float(np.mean(by_width[w]["val"])) for w in WIDTH_VALUES]
 
     best_width = WIDTH_VALUES[int(np.argmax(cv_f1_list))]
     results = {
@@ -159,21 +202,26 @@ def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
     max_iter = _get_max_iter(n_samples)
 
     n_layers_list = [len(arch) for arch in STEP2_ARCHITECTURES]
-    train_f1_list = []
-    cv_f1_list = []
-
-    for arch in tqdm(STEP2_ARCHITECTURES, desc="NN step2 depth sweep"):
-        fold_train_f1 = []
-        fold_val_f1 = []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            X_tr, X_val = X_train[train_idx], X_train[val_idx]
-            y_tr, y_val = y_train[train_idx], y_train[val_idx]
-            clf = _make_mlp(arch, max_iter=max_iter)
-            clf.fit(X_tr, y_tr)
-            fold_train_f1.append(f1_score(y_tr, clf.predict(X_tr), zero_division=0))
-            fold_val_f1.append(f1_score(y_val, clf.predict(X_val), zero_division=0))
-        train_f1_list.append(float(np.mean(fold_train_f1)))
-        cv_f1_list.append(float(np.mean(fold_val_f1)))
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (arch, max_iter, train_idx, val_idx)
+        for arch in STEP2_ARCHITECTURES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_arch)(arch, max_iter, train_idx, val_idx, X_train, y_train)
+        for arch, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN step2 depth sweep", total=len(tasks))
+    )
+    by_arch = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for arch in STEP2_ARCHITECTURES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_arch[arch]["train"].append(train_f1)
+            by_arch[arch]["val"].append(val_f1)
+            idx += 1
+    train_f1_list = [float(np.mean(by_arch[arch]["train"])) for arch in STEP2_ARCHITECTURES]
+    cv_f1_list = [float(np.mean(by_arch[arch]["val"])) for arch in STEP2_ARCHITECTURES]
 
     best_idx = int(np.argmax(cv_f1_list))
     best_architecture = STEP2_ARCHITECTURES[best_idx]
@@ -240,21 +288,26 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
     n_samples = X_train.shape[0]
     max_iter = _get_max_iter(n_samples)
 
-    train_f1_list = []
-    cv_f1_list = []
-
-    for lr in tqdm(STEP3_LR_VALUES, desc="NN step3 LR sweep"):
-        fold_train_f1 = []
-        fold_val_f1 = []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            X_tr, X_val = X_train[train_idx], X_train[val_idx]
-            y_tr, y_val = y_train[train_idx], y_train[val_idx]
-            clf = _make_mlp(best_arch, learning_rate_init=lr, max_iter=max_iter)
-            clf.fit(X_tr, y_tr)
-            fold_train_f1.append(f1_score(y_tr, clf.predict(X_tr), zero_division=0))
-            fold_val_f1.append(f1_score(y_val, clf.predict(X_val), zero_division=0))
-        train_f1_list.append(float(np.mean(fold_train_f1)))
-        cv_f1_list.append(float(np.mean(fold_val_f1)))
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (best_arch, lr, max_iter, train_idx, val_idx)
+        for lr in STEP3_LR_VALUES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_lr)(best_arch, lr, max_iter, train_idx, val_idx, X_train, y_train)
+        for best_arch, lr, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN step3 LR sweep", total=len(tasks))
+    )
+    by_lr = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for lr in STEP3_LR_VALUES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_lr[lr]["train"].append(train_f1)
+            by_lr[lr]["val"].append(val_f1)
+            idx += 1
+    train_f1_list = [float(np.mean(by_lr[lr]["train"])) for lr in STEP3_LR_VALUES]
+    cv_f1_list = [float(np.mean(by_lr[lr]["val"])) for lr in STEP3_LR_VALUES]
 
     best_idx = int(np.argmax(cv_f1_list))
     best_lr = STEP3_LR_VALUES[best_idx]
@@ -332,3 +385,163 @@ def _write_best_model_summary(results):
     ]
     _append_nn_results("\n".join(lines))
     print("Best model — architecture:", list(results["best_architecture"]), "| LR:", results["best_lr"])
+
+
+# Step 4 — Learning curve sizes [10%, 25%, 50%, 75%, 100%]
+LEARNING_CURVE_TRAIN_SIZES = [0.1, 0.25, 0.5, 0.75, 1.0]
+
+
+def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
+    """
+    Step 4 — Final model: retrain with best arch + best LR.
+    Generate: learning curve, confusion matrix, runtime table.
+    Save test set metrics and all outputs to NN_sklearn_results.txt.
+    """
+    np.random.seed(RANDOM_SEED)
+    X_train = np.asarray(X_train)
+    y_train = np.asarray(y_train).ravel()
+    X_test = np.asarray(X_test)
+    y_test = np.asarray(y_test).ravel()
+    best_arch = nn_step3["best_architecture"]
+    best_lr = nn_step3["best_lr"]
+    n_samples = X_train.shape[0]
+    max_iter = _get_max_iter(n_samples)
+    cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
+
+    # 1) Learning curve: train sizes [10%, 25%, 50%, 75%, 100%]
+    clf_lc = _make_mlp(best_arch, learning_rate_init=best_lr, max_iter=max_iter)
+    train_sizes_abs, train_scores, val_scores = learning_curve(
+        clf_lc,
+        X_train,
+        y_train,
+        train_sizes=LEARNING_CURVE_TRAIN_SIZES,
+        cv=cv_splitter,
+        scoring="f1",
+        n_jobs=N_JOBS,
+        random_state=RANDOM_SEED,
+    )
+    train_scores_mean = np.mean(train_scores, axis=1)
+    val_scores_mean = np.mean(val_scores, axis=1)
+    _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean)
+
+    # 2) Retrain final model on full train; measure fit time
+    clf_final = _make_mlp(best_arch, learning_rate_init=best_lr, max_iter=max_iter)
+    t0 = time.perf_counter()
+    clf_final.fit(X_train, y_train)
+    fit_time = time.perf_counter() - t0
+
+    # Predict on test; measure predict time
+    t0 = time.perf_counter()
+    y_pred = clf_final.predict(X_test)
+    predict_time = time.perf_counter() - t0
+
+    # Get probabilities for PR-AUC
+    y_proba = clf_final.predict_proba(X_test)[:, 1] if hasattr(clf_final, "predict_proba") else None
+
+    # 3) Confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    _plot_confusion_matrix(cm, y_test, y_pred)
+
+    # 4) Test set metrics
+    test_accuracy = float(accuracy_score(y_test, y_pred))
+    test_f1 = float(f1_score(y_test, y_pred, zero_division=0))
+    test_pr_auc = float(average_precision_score(y_test, y_proba)) if y_proba is not None else None
+
+    # 5) Write everything to NN_sklearn_results.txt
+    _write_step4_results(
+        cm=cm,
+        test_accuracy=test_accuracy,
+        test_f1=test_f1,
+        test_pr_auc=test_pr_auc,
+        fit_time=fit_time,
+        predict_time=predict_time,
+        learning_curve_sizes=train_sizes_abs.tolist(),
+        learning_curve_train=train_scores_mean.tolist(),
+        learning_curve_val=val_scores_mean.tolist(),
+    )
+    print("Step 4 done. Test F1:", round(test_f1, 4), "| Fit time:", round(fit_time, 3), "s")
+    return {
+        "clf_final": clf_final,
+        "test_accuracy": test_accuracy,
+        "test_f1": test_f1,
+        "test_pr_auc": test_pr_auc,
+        "confusion_matrix": cm,
+        "fit_time": fit_time,
+        "predict_time": predict_time,
+    }
+
+
+def _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean):
+    """Plot learning curve: X=training size, Y=train + validation F1."""
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    ax.plot(train_sizes_abs, train_scores_mean, "o-", label="Train F1")
+    ax.plot(train_sizes_abs, val_scores_mean, "s-", label="Validation F1")
+    ax.set_xlabel("Training set size")
+    ax.set_ylabel("F1")
+    ax.set_title("NN Step 4 — Learning curve")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    out_path = os.path.join(OUTPUT_DIR, "nn_learning_curve.png")
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out_path)
+
+
+def _plot_confusion_matrix(cm, y_test, y_pred):
+    """Plot confusion matrix and save to outputs/."""
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    labels = sorted(set(y_test) | set(y_pred))
+    disp = ax.imshow(cm, cmap="Blues")
+    ax.set_xticks(range(len(labels)))
+    ax.set_yticks(range(len(labels)))
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_title("NN Step 4 — Confusion matrix (test set)")
+    for i in range(len(labels)):
+        for j in range(len(labels)):
+            ax.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
+    plt.tight_layout()
+    out_path = os.path.join(OUTPUT_DIR, "nn_confusion_matrix.png")
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out_path)
+
+
+def _write_step4_results(
+    cm,
+    test_accuracy,
+    test_f1,
+    test_pr_auc,
+    fit_time,
+    predict_time,
+    learning_curve_sizes,
+    learning_curve_train,
+    learning_curve_val,
+):
+    """Append Step 4 results to NN_sklearn_results.txt."""
+    lines = [
+        "",
+        "========== NN (sklearn) Step 4 — Final model (test set) ==========",
+        "",
+        "Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):",
+        f"  Train sizes: {[int(x) for x in learning_curve_sizes]}",
+        f"  Train F1 (mean CV): {[round(x, 4) for x in learning_curve_train]}",
+        f"  Validation F1 (mean CV): {[round(x, 4) for x in learning_curve_val]}",
+        "",
+        "Test set metrics:",
+        f"  Accuracy: {test_accuracy:.4f}",
+        f"  F1: {test_f1:.4f}",
+        f"  PR-AUC (average_precision): {(test_pr_auc if test_pr_auc is not None else float('nan')):.4f}",
+        "",
+        "Confusion matrix (test set):",
+        f"  {cm.tolist()}",
+        "",
+        "Runtime:",
+        f"  Fit time: {fit_time:.4f} s",
+        f"  Predict time: {predict_time:.4f} s",
+        "",
+    ]
+    _append_nn_results("\n".join(lines))
