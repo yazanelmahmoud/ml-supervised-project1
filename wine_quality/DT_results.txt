@@ -43,15 +43,15 @@ Accuracy:     0.4615
 Macro-F1:     0.3444
 Weighted-F1:  0.4669
 
---- Per-class performance (F1 scores) ---
-  Quality 1: F1 = 0.2778
-  Quality 2: F1 = 0.4971
-  Quality 3: F1 = 0.5109
-  Quality 4: F1 = 0.4683
-  Quality 5: F1 = 0.4085
-  Quality 6: F1 = 0.2391
-  Quality 7: F1 = 0.2000
-  Quality 8: F1 = 0.0000
+--- Per-class performance (F1 scores and Accuracy) ---
+  Quality 1: F1 = 0.1538, Accuracy = 0.2500
+  Quality 2: F1 = 0.2778, Accuracy = 0.3226
+  Quality 3: F1 = 0.4971, Accuracy = 0.5359
+  Quality 4: F1 = 0.5109, Accuracy = 0.4783
+  Quality 5: F1 = 0.4683, Accuracy = 0.4229
+  Quality 6: F1 = 0.4085, Accuracy = 0.4361
+  Quality 7: F1 = 0.2391, Accuracy = 0.3235
+  Quality 8: F1 = 0.2000, Accuracy = 0.2500
 
 --- Confusion matrix (rows=true, cols=predicted) ---
     Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8
@@ -65,7 +65,7 @@ Q7    0    0    0    0    4   16   11    3
 Q8    0    0    0    0    0    0    3    1
 
 --- Runtime ---
-Fit (sec):    0.0349
+Fit (sec):    0.0350
 Predict (sec): 0.0004
 Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 

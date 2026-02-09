@@ -4,7 +4,8 @@ SGD only (no momentum, Nesterov, Adam/Adagrad/RMSprop).
 Report: learning rate, batch size, epochs/early stopping, regularization.
 Required: epoch-based learning curves (train vs val loss/metric), early stopping.
 Compare capacity scaling (depth vs width) with ~constant parameter count.
-Uses Macro-F1 for multiclass evaluation and class_weight='balanced' for imbalance.
+Uses Macro-F1 for multiclass evaluation.
+Note: MLPClassifier doesn't support class_weight parameter directly.
 """
 
 import os
@@ -102,7 +103,10 @@ def _get_max_iter(n_samples):
 
 
 def _make_mlp(hidden_layer_sizes, learning_rate_init=NN_LR, alpha=NN_L2, max_iter=10000, random_state=RANDOM_SEED):
-    """Build MLPClassifier with SGD, no momentum, early stopping, class_weight='balanced'."""
+    """Build MLPClassifier with SGD, no momentum, early stopping.
+    Note: MLPClassifier doesn't support class_weight parameter directly.
+    For class imbalance, consider using sample_weight in fit() if needed.
+    """
     return MLPClassifier(
         hidden_layer_sizes=hidden_layer_sizes,
         activation="relu",
@@ -116,8 +120,7 @@ def _make_mlp(hidden_layer_sizes, learning_rate_init=NN_LR, alpha=NN_L2, max_ite
         n_iter_no_change=EARLY_STOPPING_PATIENCE,
         validation_fraction=0.1,
         random_state=random_state,
-        momentum=0.0,
-        class_weight='balanced'  # Handle severe class imbalance
+        momentum=0.0
     )
 
 
@@ -398,7 +401,7 @@ def _write_best_model_summary(results):
         f"Best architecture (from Step 2): {list(results['best_architecture'])}",
         f"Best learning rate (from Step 3): {results['best_lr']}",
         f"Fixed: L2={NN_L2}, batch_size={BATCH_SIZE}, early_stopping_patience={EARLY_STOPPING_PATIENCE}",
-        f"Class weighting: 'balanced' (for severe class imbalance)",
+        f"Note: MLPClassifier doesn't support class_weight parameter",
         "",
     ]
     _append_nn_results("\n".join(lines))

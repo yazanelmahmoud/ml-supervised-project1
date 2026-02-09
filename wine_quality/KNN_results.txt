@@ -1,7 +1,51 @@
-================================================================================
-  k-NEAREST NEIGHBORS — RESULTS (WINE QUALITY)
-================================================================================
+============================================================
+k-NEAREST NEIGHBORS — RESULTS (Wine Quality)
+============================================================
 
-TODO: kNN results will be saved here when running models_knn.py
+--- Model-complexity: weights × metric (CV Macro-F1 vs k) ---
+k_values: [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100]
 
-================================================================================
+  weights=uniform, metric=euclidean: [0.3329, 0.3404, 0.3297, 0.3272, 0.3164, 0.3106, 0.3036, 0.2975, 0.2953, 0.2837, 0.271]
+  weights=uniform, metric=manhattan: [0.3297, 0.3368, 0.3231, 0.3117, 0.3166, 0.3102, 0.304, 0.309, 0.3, 0.2886, 0.2764]
+  weights=distance, metric=euclidean: [0.3342, 0.3456, 0.3514, 0.3474, 0.3292, 0.3344, 0.3221, 0.3148, 0.3146, 0.2983, 0.2877]
+  weights=distance, metric=manhattan: [0.3396, 0.3498, 0.3432, 0.3356, 0.3369, 0.3267, 0.3214, 0.3286, 0.3252, 0.3061, 0.2898]
+
+CV Macro-F1 at k=20:
+  weights=uniform, metric=euclidean: 0.3164
+  weights=uniform, metric=manhattan: 0.3166
+  weights=distance, metric=euclidean: 0.3292
+  weights=distance, metric=manhattan: 0.3369
+Best (k, weights, metric): {'k': 10, 'weights': 'distance', 'metric': 'euclidean'}
+best_cv_f1_macro: 0.3514
+
+============================================================
+--- Learning curves ---
+train_sizes: [340, 680, 1021, 1361, 1702, 2042, 2382, 2723, 3063, 3404]
+baseline (k=5, uniform, euclidean):
+  train_f1_macro_mean: [0.3912, 0.4293, 0.4216, 0.4408, 0.4606, 0.4648, 0.4672, 0.4667, 0.4573, 0.4553]
+  val_f1_macro_mean: [0.2664, 0.2949, 0.2778, 0.2897, 0.3072, 0.3059, 0.3216, 0.3327, 0.3374, 0.3402]
+tuned (best_config from Step 1): {'k': 10, 'weights': 'distance', 'metric': 'euclidean'}
+  train_f1_macro_mean: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+  val_f1_macro_mean: [0.2722, 0.2872, 0.285, 0.3096, 0.3206, 0.325, 0.3392, 0.3455, 0.3508, 0.3514]
+--- Test evaluation ---
+best_config (from Step 1): {'k': 10, 'weights': 'distance', 'metric': 'euclidean'}
+Accuracy: 0.5489
+Macro-F1: 0.3704
+Weighted-F1: 0.5424
+
+--- Per-class performance (F1 scores and Accuracy) ---
+  Quality 1: F1 = 0.0000, Accuracy = 0.0000
+  Quality 2: F1 = 0.2439, Accuracy = 0.1613
+  Quality 3: F1 = 0.5582, Accuracy = 0.5359
+  Quality 4: F1 = 0.5896, Accuracy = 0.6440
+  Quality 5: F1 = 0.5323, Accuracy = 0.5217
+  Quality 6: F1 = 0.5077, Accuracy = 0.4962
+  Quality 7: F1 = 0.5312, Accuracy = 0.5000
+  Quality 8: F1 = 0.0000, Accuracy = 0.0000
+
+Fit (sec): 0.0041
+Predict (sec): 0.0673
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+Confusion matrix: [[0, 0, 2, 2, 0, 0, 0, 0], [0, 5, 16, 8, 2, 0, 0, 0], [0, 4, 127, 95, 9, 2, 0, 0], [0, 1, 69, 237, 56, 5, 0, 0], [0, 0, 2, 79, 132, 37, 3, 0], [0, 0, 2, 15, 43, 66, 7, 0], [0, 0, 0, 0, 1, 16, 17, 0], [0, 0, 0, 0, 0, 1, 3, 0]]
+
+============================================================

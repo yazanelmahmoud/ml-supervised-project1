@@ -1,7 +1,54 @@
-================================================================================
-  NEURAL NETWORKS (SKLEARN) — RESULTS (WINE QUALITY)
-================================================================================
+NN (sklearn) pipeline results — Wine Quality
+============================================================
 
-TODO: sklearn NN results will be saved here when running models_nn_sklearn.py
 
-================================================================================
+========== NN (sklearn) Step 1 — Width search ==========
+Widths: [8, 16, 32, 64, 128]
+Mean train Macro-F1: [0.2043, 0.2619, 0.2738, 0.281, 0.2853]
+Mean CV Macro-F1:    [0.2017, 0.2539, 0.2702, 0.2736, 0.2727]
+Best width: 64
+========== NN (sklearn) Step 2 — Depth vs width ==========
+Architectures: [[64], [32, 32], [16, 16, 16, 16]]
+Mean train Macro-F1: [0.281, 0.2936, 0.2586]
+Mean CV Macro-F1:    [0.2736, 0.2896, 0.257]
+Best architecture: [32, 32]
+========== NN (sklearn) Step 3 — Learning rate sweep ==========
+LR values: [0.1, 0.01, 0.001, 0.0003]
+Mean train Macro-F1: [0.3631, 0.2936, 0.2257, 0.2145]
+Mean CV Macro-F1:    [0.3356, 0.2896, 0.2199, 0.2133]
+Best LR: 0.1
+========== NN (sklearn) Best model ==========
+Best architecture (from Step 2): [32, 32]
+Best learning rate (from Step 3): 0.1
+Fixed: L2=0.0001, batch_size=64, early_stopping_patience=10
+Note: MLPClassifier doesn't support class_weight parameter
+
+========== NN (sklearn) Step 4 — Final model (test set) ==========
+
+Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):
+  Train sizes: [340, 851, 1702, 2553, 3404]
+  Train Macro-F1 (mean CV): [0.2667, 0.2869, 0.2996, 0.3159, 0.3452]
+  Validation Macro-F1 (mean CV): [0.2263, 0.2597, 0.2822, 0.2996, 0.3271]
+
+Test set metrics:
+  Accuracy: 0.5461
+  Macro-F1: 0.3618
+  Weighted-F1: 0.5389
+
+--- Per-class performance (F1 scores and Accuracy) ---
+  Quality 1: F1 = 0.0000, Accuracy = 0.0000
+  Quality 2: F1 = 0.1500, Accuracy = 0.0968
+  Quality 3: F1 = 0.5919, Accuracy = 0.6456
+  Quality 4: F1 = 0.5434, Accuracy = 0.5272
+  Quality 5: F1 = 0.5553, Accuracy = 0.5652
+  Quality 6: F1 = 0.5271, Accuracy = 0.5113
+  Quality 7: F1 = 0.5263, Accuracy = 0.5882
+  Quality 8: F1 = 0.0000, Accuracy = 0.0000
+
+Confusion matrix (test set):
+  [[0, 0, 2, 1, 1, 0, 0, 0], [0, 3, 23, 5, 0, 0, 0, 0], [0, 4, 153, 73, 6, 1, 0, 0], [0, 2, 91, 194, 75, 6, 0, 0], [0, 0, 9, 61, 143, 35, 5, 0], [0, 0, 2, 12, 37, 68, 14, 0], [0, 0, 0, 0, 0, 14, 20, 0], [0, 0, 0, 0, 0, 1, 3, 0]]
+
+Runtime:
+  Fit time: 0.4601 s
+  Predict time: 0.0012 s
+  Hardware: Linux 6.14.0-1018-aws, CPU: x86_64

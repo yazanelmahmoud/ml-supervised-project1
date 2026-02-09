@@ -24,7 +24,7 @@ SVM_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SVM
 # Hyperparameter ranges
 C_VALUES = [0.1, 1, 10, 100, 1000]
 C_REF = 1  # reference C for table
-GAMMA_VALUES = [0.001, 0.01, 0.1, 1, 10, "scale", "auto"]
+GAMMA_VALUES = [0.01, "scale", 0.1]  # 3 values around scale
 
 
 def _get_hardware_note():
@@ -48,7 +48,7 @@ def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5):
     # Linear: CV Macro-F1 vs C
     linear_cv_f1_macro = []
     for c in C_VALUES:
-        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro", n_jobs=-1)
         linear_cv_f1_macro.append(float(scores.mean()))
     results["linear"] = {"C_values": list(C_VALUES), "cv_f1_macro": linear_cv_f1_macro}
@@ -64,7 +64,7 @@ def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5):
         key = f"gamma={gamma}"
         cv_f1_macro_list = []
         for c in C_VALUES:
-            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
             scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro", n_jobs=-1)
             cv_f1_macro_list.append(float(scores.mean()))
         rbf_curves[key] = cv_f1_macro_list
@@ -156,16 +156,16 @@ def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, 
     train_sizes = np.linspace(0.1, 1.0, 10)
 
     # Linear baseline
-    linear_clf = SVC(kernel="linear", C=1, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+    linear_clf = SVC(kernel="linear", C=1, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
     lc_sizes_lin, lc_train_lin, lc_val_lin = learning_curve(
         linear_clf, X_train, y_train, train_sizes=train_sizes, cv=cv_splitter, scoring="f1_macro", random_state=RANDOM_SEED
     )
     
     # Best config (RBF or linear)
     if best_config["kernel"] == "linear":
-        best_clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+        best_clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
     else:
-        best_clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+        best_clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
     
     _, lc_train_best, lc_val_best = learning_curve(
         best_clf, X_train, y_train, train_sizes=train_sizes, cv=cv_splitter, scoring="f1_macro", random_state=RANDOM_SEED
@@ -252,9 +252,9 @@ def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None):
     
     np.random.seed(RANDOM_SEED)
     if best_config["kernel"] == "linear":
-        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
     else:
-        clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced')
+        clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
     
     t0 = time.perf_counter()
     clf.fit(X_train, y_train)
