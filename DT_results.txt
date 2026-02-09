@@ -4,6 +4,7 @@ DECISION TREE — RESULTS (Adult Income)
 
 --- DATA & METHODOLOGY ---
 Target: class (<=50K vs >50K); task: binary classification.
+
 Metrics: F1, Accuracy, PR-AUC — imbalance makes accuracy insufficient;
          F1 and PR-AUC better reflect minority-class performance.
 Class distribution (train): 27178 <=50K, 8962 >50K (~3.03:1).
@@ -31,7 +32,7 @@ Number of leaves: 121
     best min_samples_leaf=50, CV F1=0.6755
 
 --- Grid-search best (joint tuning, val F1) ---
-CV F1: 0.6836
+CV F1: 0.6837
 Params: {'ccp_alpha': 9.999999999999999e-05, 'max_depth': 30, 'min_samples_leaf': 1}
 
 --- Test metrics ---
@@ -44,8 +45,8 @@ TN=6425  FP=370
 FN=904  TP=1336
 
 --- Runtime ---
-Fit (sec):    0.1467
-Predict (sec): 0.0011
+Fit (sec):    0.1463
+Predict (sec): 0.0013
 Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 
 --- Note ---

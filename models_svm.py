@@ -324,7 +324,7 @@ def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None, class_
 
 def _plot_confusion_matrix(results):
     """results is dict with 'confusion_matrix' and optionally 'class_weight'."""
-    cm = results["confusion_matrix"]
+    cm = np.asarray(results["confusion_matrix"])
     suffix = _svm_plot_suffix(results.get("class_weight"))
     title_suffix = " (class_weight=balanced)" if results.get("class_weight") == "balanced" else ""
     fig, ax = plt.subplots(figsize=(5, 4))

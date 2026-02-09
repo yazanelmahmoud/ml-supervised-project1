@@ -4,32 +4,32 @@ SUPPORT VECTOR MACHINES — RESULTS (Adult Income)
 
 --- Step 1: Model-complexity (linear vs RBF, CV F1 vs C) ---
 C_values: [0.001, 0.01, 0.1, 1, 10, 100]
-Linear cv_f1: [0.5122, 0.4568, 0.3981, 0.5008, 0.3849, 0.365]
+Linear cv_f1: [0.6005, 0.5937, 0.4073, 0.455, 0.3672, 0.3135]
 
-RBF gamma=scale cv_f1: [0.6073, 0.6269, 0.5679, 0.4884, 0.4869, 0.4709]
-RBF gamma=0.053399 cv_f1: [0.5394, 0.5366, 0.5101, 0.4291, 0.5151, 0.4605]
-RBF gamma=0.213595 cv_f1: [0.552, 0.5524, 0.5977, 0.5501, 0.4908, 0.4548]
+RBF gamma=scale cv_f1: [0.4903, 0.5277, 0.4403, 0.4327, 0.3737, 0.3962]
+RBF gamma=0.053399 cv_f1: [0.5253, 0.5625, 0.4536, 0.3919, 0.3367, 0.4782]
+RBF gamma=0.213595 cv_f1: [0.4864, 0.4603, 0.456, 0.4569, 0.3818, 0.3587]
 
-Best config: {'kernel': 'rbf', 'C': 0.01, 'gamma': 'scale'}
-best_cv_f1: 0.6269
+Best config: {'kernel': 'linear', 'C': 0.001, 'gamma': None}
+best_cv_f1: 0.6005
 
 ============================================================
 --- Learning curves ---
 train_sizes: [2891, 5782, 8673, 11564, 14456, 17347, 20238, 23129, 26020, 28912]
 baseline (linear C=0.1):
-  train_f1_mean: [0.6889, 0.6735, 0.6612, 0.6636, 0.667, 0.6771, 0.5569, 0.4117, 0.4362, 0.3995]
-  val_f1_mean: [0.6606, 0.657, 0.6541, 0.6602, 0.6652, 0.6786, 0.5565, 0.4143, 0.4358, 0.3981]
-tuned (best_config from Step 1): {'kernel': 'rbf', 'C': 0.01, 'gamma': 'scale'}
-  train_f1_mean: [0.0, 0.0182, 0.2256, 0.4295, 0.6909, 0.5512, 0.5891, 0.5962, 0.6102, 0.6251]
-  val_f1_mean: [0.0, 0.0239, 0.213, 0.4225, 0.6834, 0.5503, 0.5882, 0.5972, 0.6089, 0.6269]
+  train_f1_mean: [0.6784, 0.6604, 0.6495, 0.6536, 0.6582, 0.6682, 0.4906, 0.4292, 0.4559, 0.4099]
+  val_f1_mean: [0.6497, 0.6449, 0.6426, 0.6504, 0.6542, 0.6657, 0.4893, 0.4301, 0.4564, 0.4073]
+tuned (best_config from Step 1): {'kernel': 'linear', 'C': 0.001, 'gamma': None}
+  train_f1_mean: [0.3785, 0.395, 0.4445, 0.4995, 0.6571, 0.5505, 0.5817, 0.5987, 0.5987, 0.6002]
+  val_f1_mean: [0.3745, 0.3962, 0.4447, 0.4954, 0.6534, 0.5499, 0.5829, 0.599, 0.5986, 0.6005]
 --- Test evaluation ---
-best_config (from Step 1): {'kernel': 'rbf', 'C': 0.01, 'gamma': 'scale'}
-Accuracy: 0.6052
-F1: 0.5329
-PR-AUC: 0.6344
-Fit (sec): 169.7133
-Predict (sec): 10.3297
-Hardware: Windows 10, CPU: Intel64 Family 6 Model 140 Stepping 1, GenuineIntel
-Confusion matrix (0=<=50K, 1=>50K): [[3433, 3362], [205, 2035]]
+best_config (from Step 1): {'kernel': 'linear', 'C': 0.001, 'gamma': None}
+Accuracy: 0.7056
+F1: 0.6073
+PR-AUC: 0.5797
+Fit (sec): 29.5972
+Predict (sec): 1.5294
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+Confusion matrix (0=<=50K, 1=>50K): [[4318, 2477], [183, 2057]]
 
 ============================================================

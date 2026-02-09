@@ -29,8 +29,8 @@ NN_SKLEARN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)
 
 # Step 1 — Width search
 WIDTH_VALUES = [8, 16, 32, 64, 128, 200, 400, 700]
-# Step 2 — Depth vs width: [64], [32,32], [16,16,16,16]
-STEP2_ARCHITECTURES = [(64,), (32, 32), (16, 16, 16, 16)]
+# Step 2 — Depth: 1-layer 64, 2-layer 32→14, 3-layer 28→14→8
+STEP2_ARCHITECTURES = [(64,), (32, 14), (28, 14, 8)]
 # Step 3 — LR sweep
 STEP3_LR_VALUES = [0.1, 0.01, 0.001, 0.0003]
 

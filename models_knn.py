@@ -20,7 +20,7 @@ from evaluation import score_binary
 
 KNN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KNN_results.txt")
 
-K_VALUES = [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100, 200, 500, 1000]
+K_VALUES = [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100, 200]
 WEIGHTS_OPTIONS = ["uniform", "distance"]
 METRIC_OPTIONS = ["euclidean", "manhattan"]  # L2, L1
 
