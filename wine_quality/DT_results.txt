@@ -1,7 +1,75 @@
-================================================================================
-  DECISION TREES — RESULTS (WINE QUALITY)
-================================================================================
+============================================================
+DECISION TREE — RESULTS (Wine Quality)
+============================================================
 
-TODO: Decision Tree results will be saved here when running models_dt.py
+--- DATA & METHODOLOGY ---
+Target: quality (discrete rating/class, 1-8); task: multiclass classification.
+Metrics: Macro-F1 and Accuracy (minimum). Macro-F1 treats all classes equally,
+         critical for severe class imbalance (ratio 108.29).
+Class distribution (train): {1: 16, 2: 122, 3: 948, 4: 1473, 5: 1013, 6: 533, 7: 138, 8: 13}.
+Imbalance ratio (majority/minority): 113.31.
+Severe imbalance: minority classes (1, 8) represent <0.4% each;
+                   majority class (4) represents 34.6%.
+Leakage controls: 'class' column dropped (perfect correlation with 'quality').
+Single held-out test split; tuning via 5-fold CV on training only.
+Class weighting: 'balanced' used to handle severe imbalance.
 
-================================================================================
+--- Split criterion and justification ---
+Criterion: gini. Gini is faster than entropy and yields similar splits;
+entropy slightly prefers balanced splits; for this dataset Gini is chosen for speed.
+
+--- Best hyperparameters (CV on training) ---
+ccp_alpha: 0.000351
+max_depth: 20
+min_samples_leaf: 2
+class_weight: balanced
+Final depth: 20
+Number of leaves: 376
+
+--- Best from each model-complexity curve (other params at standard) ---
+  ccp_alpha curve (max_depth=None, min_samples_leaf=1):
+    best ccp_alpha=0.001233, CV Macro-F1=0.3162
+  max_depth curve (ccp_alpha=0, min_samples_leaf=1):
+    best max_depth=15, CV Macro-F1=0.3230
+  min_samples_leaf curve (ccp_alpha=0, max_depth=None):
+    best min_samples_leaf=2, CV Macro-F1=0.3172
+
+--- Grid-search best (joint tuning, val Macro-F1) ---
+CV Macro-F1: 0.3253
+Params: {'ccp_alpha': 0.0003511191734215131, 'max_depth': 20, 'min_samples_leaf': 2}
+
+--- Test metrics ---
+Accuracy:     0.4615
+Macro-F1:     0.3444
+Weighted-F1:  0.4669
+
+--- Per-class performance (F1 scores) ---
+  Quality 1: F1 = 0.2778
+  Quality 2: F1 = 0.4971
+  Quality 3: F1 = 0.5109
+  Quality 4: F1 = 0.4683
+  Quality 5: F1 = 0.4085
+  Quality 6: F1 = 0.2391
+  Quality 7: F1 = 0.2000
+  Quality 8: F1 = 0.0000
+
+--- Confusion matrix (rows=true, cols=predicted) ---
+    Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8
+Q1    1    0    1    1    1    0    0    0
+Q2    2   10   14    5    0    0    0    0
+Q3    5   21  127   69   11    4    0    0
+Q4    1    7  114  176   47   16    7    0
+Q5    0    1   14   62  107   57   11    1
+Q6    0    2    4    8   34   58   26    1
+Q7    0    0    0    0    4   16   11    3
+Q8    0    0    0    0    0    0    3    1
+
+--- Runtime ---
+Fit (sec):    0.0349
+Predict (sec): 0.0004
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+
+--- Note ---
+Revisit hypothesis from hypothesis.txt in DT conclusions.
+
+============================================================
