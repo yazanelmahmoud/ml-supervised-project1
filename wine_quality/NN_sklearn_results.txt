@@ -21,7 +21,7 @@ Best LR: 0.1
 Best architecture (from Step 2): [64]
 Best learning rate (from Step 3): 0.1
 Fixed: L2=0.0001, batch_size=64, early_stopping_patience=10
-Note: MLPClassifier doesn't support class_weight parameter
+No class weighting.
 
 ========== NN (sklearn) Step 4 — Final model (test set) ==========
 
@@ -49,6 +49,6 @@ Confusion matrix (test set):
   [[0, 0, 2, 2, 0, 0, 0, 0], [0, 1, 22, 8, 0, 0, 0, 0], [0, 0, 146, 87, 4, 0, 0, 0], [0, 0, 86, 238, 39, 5, 0, 0], [0, 0, 6, 100, 112, 33, 2, 0], [0, 0, 1, 20, 43, 62, 7, 0], [0, 0, 0, 0, 0, 20, 14, 0], [0, 0, 0, 0, 0, 4, 0, 0]]
 
 Runtime:
-  Fit time: 0.3001 s
-  Predict time: 0.0003 s
+  Fit time: 0.3050 s
+  Predict time: 0.0004 s
   Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
