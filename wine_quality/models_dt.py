@@ -18,6 +18,7 @@ from sklearn.metrics import confusion_matrix
 
 from config import RANDOM_SEED, TASK_TYPE
 from evaluation import score_multiclass
+import numpy as np
 
 # Gini: faster to compute, often equivalent to entropy for splits; entropy slightly
 # prefers balanced splits but Gini is preferred here for speed with similar performance.
@@ -389,14 +390,16 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
         f"Macro-F1:     {m.get('f1_macro', 0):.4f}",
         f"Weighted-F1:  {m.get('f1_weighted', 0):.4f}",
         "",
-        "--- Per-class performance (F1 scores) ---",
+        "--- Per-class performance (F1 scores and Accuracy) ---",
     ]
     
-    # Add per-class F1 scores
+    # Add per-class F1 scores and accuracy
+    accuracy_per_class = m.get("accuracy_per_class", {})
     for class_label in sorted(unique_classes):
         class_key = f"class_{class_label}"
-        f1_score = f1_per_class.get(class_key, 0.0)
-        lines.append(f"  Quality {class_label}: F1 = {f1_score:.4f}")
+        f1_score_val = f1_per_class.get(class_key, 0.0)
+        accuracy_val = accuracy_per_class.get(class_key, 0.0)
+        lines.append(f"  Quality {class_label}: F1 = {f1_score_val:.4f}, Accuracy = {accuracy_val:.4f}")
     
     lines.extend([
         "",
