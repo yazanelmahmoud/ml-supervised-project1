@@ -3,38 +3,38 @@ k-NEAREST NEIGHBORS — RESULTS (Adult Income)
 ============================================================
 
 --- Model-complexity: weights × metric (CV F1 vs k) ---
-k_values: [3, 5, 10, 15, 20, 25, 30, 40, 50]
+k_values: [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100]
 
-  weights=uniform, metric=euclidean: [0.6359, 0.6472, 0.6398, 0.6636, 0.6543, 0.664, 0.6543, 0.6589, 0.6582]
-  weights=uniform, metric=manhattan: [0.6326, 0.6442, 0.6356, 0.6594, 0.6493, 0.6592, 0.6484, 0.6485, 0.6487]
-  weights=distance, metric=euclidean: [0.6258, 0.6328, 0.6419, 0.6467, 0.6482, 0.6494, 0.6502, 0.6502, 0.6505]
-  weights=distance, metric=manhattan: [0.6207, 0.6263, 0.6376, 0.6441, 0.6422, 0.6429, 0.6435, 0.6443, 0.6421]
+  weights=uniform, metric=euclidean: [0.6342, 0.6469, 0.6413, 0.6633, 0.6545, 0.6644, 0.6535, 0.6594, 0.6584, 0.6546, 0.6521]
+  weights=uniform, metric=manhattan: [0.6332, 0.6438, 0.6351, 0.6591, 0.6488, 0.6589, 0.6483, 0.6488, 0.6483, 0.6497, 0.6468]
+  weights=distance, metric=euclidean: [0.6238, 0.6323, 0.6419, 0.647, 0.6478, 0.6494, 0.6504, 0.6502, 0.6503, 0.6475, 0.6459]
+  weights=distance, metric=manhattan: [0.6195, 0.6264, 0.6377, 0.6444, 0.6426, 0.6432, 0.6436, 0.6438, 0.642, 0.6419, 0.6395]
 
 CV F1 at k=20:
-  weights=uniform, metric=euclidean: 0.6543
-  weights=uniform, metric=manhattan: 0.6493
-  weights=distance, metric=euclidean: 0.6482
-  weights=distance, metric=manhattan: 0.6422
+  weights=uniform, metric=euclidean: 0.6545
+  weights=uniform, metric=manhattan: 0.6488
+  weights=distance, metric=euclidean: 0.6478
+  weights=distance, metric=manhattan: 0.6426
 Best (k, weights, metric): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
-best_cv_f1: 0.6640
+best_cv_f1: 0.6644
 
 ============================================================
 --- Learning curves ---
 train_sizes: [2891, 5782, 8673, 11564, 14456, 17347, 20238, 23129, 26020, 28912]
 baseline (k=5, uniform, euclidean):
-  train_f1_mean: [0.7619, 0.7527, 0.7484, 0.7486, 0.7463, 0.7443, 0.7467, 0.7474, 0.7471, 0.7471]
-  val_f1_mean: [0.6344, 0.6328, 0.6355, 0.641, 0.6405, 0.6444, 0.6461, 0.6455, 0.6465, 0.6472]
+  train_f1_mean: [0.7618, 0.752, 0.7484, 0.7482, 0.7466, 0.7448, 0.7468, 0.7476, 0.7471, 0.7469]
+  val_f1_mean: [0.6342, 0.6323, 0.636, 0.6412, 0.6407, 0.6439, 0.6467, 0.6464, 0.647, 0.6469]
 tuned (best_config from Step 1): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
-  train_f1_mean: [0.6813, 0.6725, 0.6773, 0.6847, 0.6833, 0.682, 0.6858, 0.6817, 0.683, 0.6859]
-  val_f1_mean: [0.6383, 0.6418, 0.6493, 0.653, 0.655, 0.6566, 0.661, 0.6575, 0.661, 0.664]
+  train_f1_mean: [0.6811, 0.6727, 0.6774, 0.6848, 0.6835, 0.6822, 0.6858, 0.6812, 0.6824, 0.6856]
+  val_f1_mean: [0.6387, 0.642, 0.6495, 0.6535, 0.6542, 0.6564, 0.6614, 0.6573, 0.6605, 0.6644]
 --- Test evaluation ---
 best_config (from Step 1): {'k': 25, 'weights': 'uniform', 'metric': 'euclidean'}
 Accuracy: 0.8444
-F1: 0.6594
+F1: 0.6591
 PR-AUC: 0.7420
-Fit (sec): 0.0023
-Predict (sec): 1.6654
-Hardware: Windows 10, CPU: Intel64 Family 6 Model 140 Stepping 1, GenuineIntel
-Confusion matrix (0=<=50K, 1=>50K): [[6268, 527], [879, 1361]]
+Fit (sec): 0.0085
+Predict (sec): 0.2714
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+Confusion matrix (0=<=50K, 1=>50K): [[6270, 525], [881, 1359]]
 
 ============================================================
