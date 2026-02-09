@@ -1,0 +1,30 @@
+================================================================================
+  EDA SUMMARY — WINE QUALITY DATASET
+================================================================================
+
+The Wine Quality dataset contains 5,320 samples with 14 features after removing 
+duplicates. The dataset exhibits a highly imbalanced multiclass classification 
+problem with 8 quality classes (ranging from 1 to 8), where the majority class 
+(quality 4) represents 34.6% of samples while the minority classes (quality 1 and 8) 
+represent less than 0.4% each, resulting in an imbalance ratio of 108.29. This severe 
+imbalance will require careful evaluation metrics (Macro-F1) and potentially 
+class-weighting or resampling strategies during model training.
+
+The dataset consists entirely of numeric features (13 features plus the target), 
+with no missing values. Key observations include: (1) The "class" column shows perfect 
+correlation (1.0) with the target "quality" and must be dropped to prevent data leakage. 
+(2) The "type" feature (red=0, white=1) shows strong negative correlation (-0.66) with 
+quality, indicating that wine type is an important predictor. (3) Other highly correlated 
+features with quality include total_sulfur_dioxide (-0.56), sulphates (0.40), alcohol 
+(0.31), and pH (0.26). (4) Several features show high inter-correlation (e.g., 
+total_sulfur_dioxide and free_sulfur_dioxide: 0.72), suggesting potential redundancy 
+that may benefit from dimensionality reduction or feature selection.
+
+Preprocessing steps will include: dropping the "class" column (leakage), standardizing 
+all numeric features using StandardScaler (required for distance-based and 
+regularization-sensitive algorithms), and maintaining the "type" feature as it provides 
+valuable predictive information. The dataset will be split using stratified sampling 
+to preserve class distribution in train/test splits, which is critical given the severe 
+class imbalance.
+
+================================================================================

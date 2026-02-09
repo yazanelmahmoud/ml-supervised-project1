@@ -1,0 +1,41 @@
+================================================================================
+  HYPOTHESIS — WINE QUALITY DATASET
+================================================================================
+
+We hypothesize that model performance will be strongly influenced by how well each 
+algorithm handles the severe class imbalance (ratio 108.29) and the moderate-dimensional 
+numeric feature space with non-linear interactions. The dataset exhibits 8 quality 
+classes with extreme imbalance where quality classes 1 and 8 represent less than 0.4% 
+each, while quality 4 dominates at 34.6%. Additionally, several features show strong 
+correlations with the target (type: -0.66, total_sulfur_dioxide: -0.56, sulphates: 0.40, 
+alcohol: 0.31) and moderate inter-feature correlations (e.g., total_sulfur_dioxide and 
+free_sulfur_dioxide: 0.72), suggesting both predictive power and potential redundancy.
+
+Given these characteristics, we expect RBF Support Vector Machines to perform best 
+because they can capture non-linear decision boundaries through the kernel trick while 
+handling the moderate dimensionality (12 features after dropping "class"). With proper 
+class weighting to address imbalance, RBF SVMs should effectively separate the quality 
+classes. Neural Networks (shallow-wide architectures) are expected to perform similarly 
+well by learning complex feature interactions through hidden layers, though they require 
+careful regularization and class weighting to avoid overfitting on minority classes. 
+Decision Trees should perform moderately well due to their ability to handle non-linear 
+interactions and categorical-like splits (e.g., type), but deep trees risk overfitting 
+on the imbalanced data, requiring strong pruning. Linear SVMs are expected to underperform 
+relative to RBF SVMs due to their inability to capture non-linear relationships between 
+features like alcohol, sulphates, and type that show complex interactions with quality.
+
+We expect k-Nearest Neighbors to perform worst among all algorithms. The severe class 
+imbalance means that for any query point, the k nearest neighbors will likely be dominated 
+by the majority class (quality 4), leading to poor predictions for minority classes. 
+Additionally, kNN suffers from the curse of dimensionality effects even with moderate 
+dimensions (12 features), where distance metrics become less discriminative. The presence 
+of correlated features (e.g., total_sulfur_dioxide and free_sulfur_dioxide) further 
+degrades kNN performance by introducing redundant distance contributions, making the 
+distance metric less meaningful for quality prediction.
+
+In summary, we predict the ranking: RBF SVM ≈ Shallow-Wide NN > Pruned DT > Linear SVM > 
+kNN, with performance gaps driven primarily by how well each method handles severe class 
+imbalance, non-linear feature interactions, and the curse of dimensionality effects in 
+the moderate-dimensional space.
+
+================================================================================
