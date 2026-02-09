@@ -21,6 +21,17 @@ from evaluation import score_multiclass
 
 SVM_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SVM_results.txt")
 
+
+def _svm_results_path(class_weight):
+    """Path for results file; use _no_weights.txt when class_weight is None."""
+    return SVM_RESULTS_PATH.replace(".txt", "_no_weights.txt") if class_weight is None else SVM_RESULTS_PATH
+
+
+def _svm_plot_suffix(class_weight):
+    """Filename suffix for plots when not using class weighting."""
+    return "_no_weights" if class_weight is None else ""
+
+
 # Hyperparameter ranges
 C_VALUES = [0.1, 1, 10, 100, 1000]
 C_REF = 1  # reference C for table
@@ -35,20 +46,20 @@ def _get_hardware_note():
         return "unknown"
 
 
-def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5):
+def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5, class_weight='balanced'):
     """
     SVM model-complexity: linear and RBF kernels, CV Macro-F1 vs C (and gamma for RBF).
-    Two panels: Linear (C vs Macro-F1) | RBF (C vs Macro-F1 for different gammas).
-    Best params from linear + RBF. Save plots to outputs/.
+    class_weight: 'balanced' (default) or None for no class weighting.
     """
-    results = {"linear": {}, "rbf": {}, "best_config": None, "best_cv_f1_macro": -1}
+    results = {"linear": {}, "rbf": {}, "best_config": None, "best_cv_f1_macro": -1, "class_weight": class_weight}
     np.random.seed(RANDOM_SEED)
     cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
+    cw_kw = {} if class_weight is None else {"class_weight": class_weight}
 
     # Linear: CV Macro-F1 vs C
     linear_cv_f1_macro = []
     for c in C_VALUES:
-        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro", n_jobs=-1)
         linear_cv_f1_macro.append(float(scores.mean()))
     results["linear"] = {"C_values": list(C_VALUES), "cv_f1_macro": linear_cv_f1_macro}
@@ -64,7 +75,7 @@ def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5):
         key = f"gamma={gamma}"
         cv_f1_macro_list = []
         for c in C_VALUES:
-            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
             scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro", n_jobs=-1)
             cv_f1_macro_list.append(float(scores.mean()))
         rbf_curves[key] = cv_f1_macro_list
@@ -82,13 +93,15 @@ def run_svm_model_complexity(X_train, y_train, X_test, y_test, cv=5):
 
 def _plot_model_complexity(results):
     """Two panels: Linear (C vs Macro-F1) | RBF (C vs Macro-F1 for different gammas)."""
+    suffix = _svm_plot_suffix(results.get("class_weight"))
+    title_suffix = " (no class weight)" if results.get("class_weight") is None else ""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     # Panel 1: Linear
     ax = axes[0]
     ax.plot(results["linear"]["C_values"], results["linear"]["cv_f1_macro"], "o-", label="linear", linewidth=2, markersize=8)
     ax.set_xlabel("C", fontsize=12)
     ax.set_ylabel("Cross-Val Macro-F1", fontsize=12)
-    ax.set_title("SVM — Linear kernel (CV Macro-F1 vs C)", fontsize=14, fontweight='bold')
+    ax.set_title("SVM — Linear kernel (CV Macro-F1 vs C)" + title_suffix, fontsize=14, fontweight='bold')
     ax.set_xscale("log")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -98,12 +111,12 @@ def _plot_model_complexity(results):
         ax.plot(results["rbf"]["C_values"], vals, "o-", label=key, linewidth=2, markersize=6)
     ax.set_xlabel("C", fontsize=12)
     ax.set_ylabel("Cross-Val Macro-F1", fontsize=12)
-    ax.set_title("SVM — RBF kernel (CV Macro-F1 vs C)", fontsize=14, fontweight='bold')
+    ax.set_title("SVM — RBF kernel (CV Macro-F1 vs C)" + title_suffix, fontsize=14, fontweight='bold')
     ax.set_xscale("log")
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "svm_model_complexity.png")
+    out_path = os.path.join(OUTPUT_DIR, f"svm_model_complexity{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
@@ -116,13 +129,15 @@ def _print_model_complexity(results):
     for key in results["rbf"]["curves"]:
         print("RBF", key, "— CV Macro-F1:", [round(x, 4) for x in results["rbf"]["curves"][key]])
     print("Best config:", results["best_config"], "| best_cv_f1_macro:", round(results["best_cv_f1_macro"], 4))
-    print("Results saved to:", SVM_RESULTS_PATH)
+    print("Results saved to:", _svm_results_path(results.get("class_weight")))
 
 
 def _save_model_complexity(results):
+    cw = results.get("class_weight")
+    header = "SUPPORT VECTOR MACHINES — RESULTS (Wine Quality)" + (" [no class weight]" if cw is None else "")
     lines = [
         "=" * 60,
-        "SUPPORT VECTOR MACHINES — RESULTS (Wine Quality)",
+        header,
         "=" * 60,
         "",
         "--- Step 1: Model-complexity (linear vs RBF, CV Macro-F1 vs C) ---",
@@ -139,33 +154,34 @@ def _save_model_complexity(results):
         "",
         "=" * 60,
     ])
-    with open(SVM_RESULTS_PATH, "w", encoding="utf-8") as f:
+    with open(_svm_results_path(cw), "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
-def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, cv=5):
+def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, cv=5, class_weight='balanced'):
     """
     Step 2: Learning curves — train/val Macro-F1 vs training size.
-    Use (a) linear and (b) RBF with chosen hyperparams (or baseline vs best). Two panels.
+    class_weight: 'balanced' (default) or None for no class weighting.
     """
     if best_config is None:
         best_config = {"kernel": "rbf", "C": 100, "gamma": "scale"}
-    
+    cw_kw = {} if class_weight is None else {"class_weight": class_weight}
+
     np.random.seed(RANDOM_SEED)
     cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
     train_sizes = np.linspace(0.1, 1.0, 10)
 
     # Linear baseline
-    linear_clf = SVC(kernel="linear", C=1, random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+    linear_clf = SVC(kernel="linear", C=1, random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
     lc_sizes_lin, lc_train_lin, lc_val_lin = learning_curve(
         linear_clf, X_train, y_train, train_sizes=train_sizes, cv=cv_splitter, scoring="f1_macro", random_state=RANDOM_SEED
     )
-    
+
     # Best config (RBF or linear)
     if best_config["kernel"] == "linear":
-        best_clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+        best_clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
     else:
-        best_clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+        best_clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
     
     _, lc_train_best, lc_val_best = learning_curve(
         best_clf, X_train, y_train, train_sizes=train_sizes, cv=cv_splitter, scoring="f1_macro", random_state=RANDOM_SEED
@@ -186,6 +202,7 @@ def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, 
             "val_f1_macro_std": lc_val_best.std(axis=1).tolist(),
         },
         "best_config": best_config,
+        "class_weight": class_weight,
     }
     _plot_learning_curves(results)
     _print_learning_curves(results)
@@ -194,6 +211,8 @@ def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, 
 
 
 def _plot_learning_curves(results):
+    suffix = _svm_plot_suffix(results.get("class_weight"))
+    title_suffix = " (no class weight)" if results.get("class_weight") is None else ""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     sizes = results["train_sizes"]
     for ax, label, data in zip(
@@ -202,18 +221,18 @@ def _plot_learning_curves(results):
         [results["linear"], results["best"]],
     ):
         ax.plot(sizes, data["train_f1_macro_mean"], "o-", label="Train Macro-F1")
-        ax.fill_between(sizes, np.array(data["train_f1_macro_mean"]) - np.array(data["train_f1_macro_std"]), 
+        ax.fill_between(sizes, np.array(data["train_f1_macro_mean"]) - np.array(data["train_f1_macro_std"]),
                        np.array(data["train_f1_macro_mean"]) + np.array(data["train_f1_macro_std"]), alpha=0.2)
         ax.plot(sizes, data["val_f1_macro_mean"], "s-", label="Val Macro-F1")
-        ax.fill_between(sizes, np.array(data["val_f1_macro_mean"]) - np.array(data["val_f1_macro_std"]), 
+        ax.fill_between(sizes, np.array(data["val_f1_macro_mean"]) - np.array(data["val_f1_macro_std"]),
                        np.array(data["val_f1_macro_mean"]) + np.array(data["val_f1_macro_std"]), alpha=0.2)
         ax.set_xlabel("Training size")
         ax.set_ylabel("Macro-F1")
-        ax.set_title(label)
+        ax.set_title(label + title_suffix)
         ax.legend()
         ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "svm_learning_curves.png"), dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(OUTPUT_DIR, f"svm_learning_curves{suffix}.png"), dpi=150, bbox_inches="tight")
     plt.show()
 
 
@@ -222,7 +241,7 @@ def _print_learning_curves(results):
     print("train_sizes:", results["train_sizes"])
     print("Linear: val_f1_macro_mean:", [round(x, 4) for x in results["linear"]["val_f1_macro_mean"]])
     print("Best:", results["best_config"], "val_f1_macro_mean:", [round(x, 4) for x in results["best"]["val_f1_macro_mean"]])
-    print("Appended to:", SVM_RESULTS_PATH)
+    print("Appended to:", _svm_results_path(results.get("class_weight")))
 
 
 def _append_learning_curves(results):
@@ -238,23 +257,24 @@ def _append_learning_curves(results):
         "  val_f1_macro_mean: " + str([round(x, 4) for x in results["best"]["val_f1_macro_mean"]]),
         "",
     ]
-    with open(SVM_RESULTS_PATH, "a", encoding="utf-8") as f:
+    with open(_svm_results_path(results.get("class_weight")), "a", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
-def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None):
+def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None, class_weight='balanced'):
     """
     Step 3: Refit best SVM on full train; evaluate once on test.
-    Report metrics, runtime, confusion matrix. Append to SVM_results.txt.
+    class_weight: 'balanced' (default) or None for no class weighting.
     """
     if best_config is None:
         best_config = {"kernel": "rbf", "C": 100, "gamma": "scale"}
-    
+    cw_kw = {} if class_weight is None else {"class_weight": class_weight}
+
     np.random.seed(RANDOM_SEED)
     if best_config["kernel"] == "linear":
-        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
     else:
-        clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, class_weight='balanced', probability=True)
+        clf = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"], random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
     
     t0 = time.perf_counter()
     clf.fit(X_train, y_train)
@@ -271,22 +291,28 @@ def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None):
         "test_metrics": metrics,
         "confusion_matrix": cm.tolist(),
         "runtime": {"fit_sec": fit_time, "predict_sec": predict_time},
+        "class_weight": class_weight,
     }
     _print_test_eval(results)
     _append_test_eval(results)
-    _plot_confusion_matrix(cm)
+    _plot_confusion_matrix(results)
     return results
 
 
-def _plot_confusion_matrix(cm):
-    """Plot confusion matrix heatmap."""
+def _plot_confusion_matrix(results):
+    """Plot confusion matrix heatmap. results is dict with 'confusion_matrix' and optionally 'class_weight'."""
+    cm = results["confusion_matrix"]
+    if isinstance(cm, list):
+        cm = np.array(cm)
+    suffix = _svm_plot_suffix(results.get("class_weight"))
+    title_suffix = " (no class weight)" if results.get("class_weight") is None else ""
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, cbar_kws={'label': 'Count'})
     ax.set_xlabel('Predicted Quality')
     ax.set_ylabel('True Quality')
-    ax.set_title('SVM Confusion Matrix')
+    ax.set_title('SVM Confusion Matrix' + title_suffix)
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "svm_confusion_matrix.png"), dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(OUTPUT_DIR, f"svm_confusion_matrix{suffix}.png"), dpi=150, bbox_inches="tight")
     plt.show()
 
 
@@ -296,7 +322,7 @@ def _print_test_eval(results):
     print("Test metrics:", results["test_metrics"])
     print("Runtime - fit (s):", round(results["runtime"]["fit_sec"], 4), "| predict (s):", round(results["runtime"]["predict_sec"], 4))
     print("Confusion matrix:", results["confusion_matrix"])
-    print("Appended to:", SVM_RESULTS_PATH)
+    print("Appended to:", _svm_results_path(results.get("class_weight")))
 
 
 def _append_test_eval(results):
@@ -332,5 +358,5 @@ def _append_test_eval(results):
         "",
         "=" * 60,
     ])
-    with open(SVM_RESULTS_PATH, "a", encoding="utf-8") as f:
+    with open(_svm_results_path(results.get("class_weight")), "a", encoding="utf-8") as f:
         f.write("\n".join(lines))

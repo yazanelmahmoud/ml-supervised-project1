@@ -15,12 +15,12 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold, learning_curve
 from sklearn.metrics import confusion_matrix
 
-from config import RANDOM_SEED
+from config import RANDOM_SEED, OUTPUT_DIR
 from evaluation import score_binary
 
 KNN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KNN_results.txt")
 
-K_VALUES = [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100]
+K_VALUES = [3, 5, 10, 15, 20, 25, 30, 40, 50, 70, 100, 200, 500, 1000]
 WEIGHTS_OPTIONS = ["uniform", "distance"]
 METRIC_OPTIONS = ["euclidean", "manhattan"]  # L2, L1
 
@@ -270,9 +270,34 @@ def run_knn_test_eval(X_train, y_train, X_test, y_test, best_config=None):
         "confusion_matrix": cm.tolist(),
         "runtime": {"fit_sec": fit_time, "predict_sec": predict_time},
     }
+    _plot_confusion_matrix(results)
     _print_test_eval(results)
     _append_test_eval(results)
     return results
+
+
+def _plot_confusion_matrix(results):
+    """Plot confusion matrix for best kNN (binary: <=50K, >50K). Save to outputs/."""
+    cm = np.array(results["confusion_matrix"])
+    fig, ax = plt.subplots(figsize=(5, 4))
+    im = ax.imshow(cm, cmap="Blues")
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(["<=50K", ">50K"])
+    ax.set_yticklabels(["<=50K", ">50K"])
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+    for i in range(2):
+        for j in range(2):
+            ax.text(j, i, str(cm[i, j]), ha="center", va="center",
+                    color="black" if cm[i, j] < cm.max() / 2 else "white")
+    plt.colorbar(im, ax=ax, label="Count")
+    ax.set_title("kNN Confusion Matrix (threshold 0.5)")
+    plt.tight_layout()
+    out_path = os.path.join(OUTPUT_DIR, "knn_confusion_matrix.png")
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out_path)
 
 
 def _print_test_eval(results):

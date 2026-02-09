@@ -14,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import learning_curve, cross_val_score, GridSearchCV, StratifiedKFold
 from sklearn.metrics import confusion_matrix
 
-from config import RANDOM_SEED
+from config import RANDOM_SEED, OUTPUT_DIR
 from evaluation import score_binary
 
 
@@ -55,14 +55,16 @@ def _train_and_eval(clf, X_tr, y_tr, X_te, y_te):
     return metrics, y_pred, y_proba, fit_time, predict_time
 
 
-def run_dt(X_train, y_train, X_test, y_test, cv=5):
+def run_dt(X_train, y_train, X_test, y_test, cv=5, class_weight=None):
     """
     Train and tune DT (ccp_alpha, max_depth, min_samples_leaf) via CV on training only.
     Compute learning/model-complexity curves, runtime.
-    Returns dict with all results and saves to DT_results.txt.
+    Returns dict with all results and saves to DT_results.txt (or DT_results_class_weight.txt if class_weight='balanced').
+    class_weight: None (default) or 'balanced' for imbalance handling.
     """
     results = {}
     np.random.seed(RANDOM_SEED)
+    cw_kw = {} if class_weight is None else {"class_weight": class_weight}
 
     # 1) Grid search: tune ccp_alpha, max_depth, min_samples_leaf via CV on training only
     param_grid = {
@@ -70,7 +72,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         "max_depth": MAX_DEPTHS,
         "min_samples_leaf": MIN_SAMPLES_LEAF,
     }
-    base_clf = DecisionTreeClassifier(criterion=CRITERION, random_state=RANDOM_SEED)
+    base_clf = DecisionTreeClassifier(criterion=CRITERION, random_state=RANDOM_SEED, **cw_kw)
     cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
     gs = GridSearchCV(base_clf, param_grid, cv=cv_splitter, scoring="f1", n_jobs=-1)
     gs.fit(X_train, y_train)
@@ -91,6 +93,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=None,
             min_samples_leaf=1,
             random_state=RANDOM_SEED,
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv, scoring="f1")
         mc_cross_val_f1.append(scores.mean())
@@ -115,6 +118,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=depth,
             min_samples_leaf=1,
             random_state=RANDOM_SEED,
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv, scoring="f1")
         mc_md_cross_val_f1.append(scores.mean())
@@ -139,6 +143,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=None,
             min_samples_leaf=msl,
             random_state=RANDOM_SEED,
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv, scoring="f1")
         mc_msl_cross_val_f1.append(scores.mean())
@@ -162,6 +167,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         max_depth=best_max_depth,
         min_samples_leaf=best_min_samples,
         random_state=RANDOM_SEED,
+        **cw_kw,
     )
     lc_sizes, lc_train, lc_cross_val = learning_curve(
         best_clf_base,
@@ -183,6 +189,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         max_depth=best_max_depth,
         min_samples_leaf=best_min_samples,
         random_state=RANDOM_SEED,
+        **cw_kw,
     )
     metrics, y_pred, y_proba, fit_time, predict_time = _train_and_eval(
         clf_final, X_train, y_train, X_test, y_test
@@ -196,6 +203,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         "max_depth": best_max_depth,
         "min_samples_leaf": best_min_samples,
     }
+    results["class_weight"] = class_weight
     results["depth"] = int(clf_final.get_depth())
     results["n_leaves"] = int(clf_final.get_n_leaves())
     results["test_metrics"] = metrics
@@ -209,6 +217,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
 
 def _plot_and_print(results):
     """Plot learning curve and three model-complexity curves (ccp_alpha, max_depth, min_samples_leaf)."""
+    cw_suffix = " (class_weight=balanced)" if results.get("class_weight") == "balanced" else ""
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Top-left: Learning curve
@@ -224,7 +233,7 @@ def _plot_and_print(results):
         np.array(lc["cross_val_f1_mean"]) + np.array(lc["cross_val_f1_std"]), alpha=0.2)
     ax.set_xlabel("Training size")
     ax.set_ylabel("F1")
-    ax.set_title("DT Learning Curve")
+    ax.set_title("DT Learning Curve" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -237,7 +246,7 @@ def _plot_and_print(results):
     ax.axvline(mc["best_ccp_alpha_from_curve"], color="gray", ls="--", label="best")
     ax.set_xlabel("ccp_alpha")
     ax.set_ylabel("F1")
-    ax.set_title("DT Model-Complexity (ccp_alpha)")
+    ax.set_title("DT Model-Complexity (ccp_alpha)" + cw_suffix)
     ax.set_xscale("symlog", linthresh=1e-5)
     ax.set_xlim(left=0)  # start at 0, no negative part on x-axis
     ax.legend()
@@ -256,7 +265,7 @@ def _plot_and_print(results):
     ax.set_xticklabels([str(d) if d is not None else "None" for d in depths])
     ax.set_xlabel("max_depth")
     ax.set_ylabel("F1")
-    ax.set_title("DT Model-Complexity (max_depth)")
+    ax.set_title("DT Model-Complexity (max_depth)" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -268,7 +277,7 @@ def _plot_and_print(results):
     ax.axvline(mc_msl["best_min_samples_leaf_from_curve"], color="gray", ls="--", label="best")
     ax.set_xlabel("min_samples_leaf")
     ax.set_ylabel("F1")
-    ax.set_title("DT Model-Complexity (min_samples_leaf)")
+    ax.set_title("DT Model-Complexity (min_samples_leaf)" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -296,11 +305,39 @@ def _plot_and_print(results):
     print("\nConfusion matrix (0=<=50K, 1=>50K):")
     for row in results["confusion_matrix"]:
         print(row)
-    print("\nResults saved to:", DT_RESULTS_PATH)
+    _plot_confusion_matrix(results)
+    _results_path = DT_RESULTS_PATH if results.get("class_weight") != "balanced" else DT_RESULTS_PATH.replace(".txt", "_class_weight.txt")
+    print("\nResults saved to:", _results_path)
+
+
+def _plot_confusion_matrix(results):
+    """Plot confusion matrix for best DT (binary: <=50K, >50K). Save to outputs/."""
+    cm = np.array(results["confusion_matrix"])
+    suffix = "_class_weight" if results.get("class_weight") == "balanced" else ""
+    title_suffix = " (class_weight=balanced)" if results.get("class_weight") == "balanced" else ""
+    fig, ax = plt.subplots(figsize=(5, 4))
+    im = ax.imshow(cm, cmap="Blues")
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(["<=50K", ">50K"])
+    ax.set_yticklabels(["<=50K", ">50K"])
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+    for i in range(2):
+        for j in range(2):
+            ax.text(j, i, str(cm[i, j]), ha="center", va="center",
+                    color="black" if cm[i, j] < cm.max() / 2 else "white")
+    plt.colorbar(im, ax=ax, label="Count")
+    ax.set_title("DT Confusion Matrix (threshold 0.5)" + title_suffix)
+    plt.tight_layout()
+    out_path = os.path.join(OUTPUT_DIR, f"dt_confusion_matrix{suffix}.png")
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out_path)
 
 
 def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
-    """Write DT results to DT_results.txt including DATA & METHODOLOGY."""
+    """Write DT results to DT_results.txt (or _class_weight.txt when class_weight='balanced')."""
     m = results["test_metrics"]
     cm = np.array(results["confusion_matrix"])
     rt = results["runtime"]
@@ -312,13 +349,15 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
     n_neg = int(np.sum(y_train == 0))
     imbalance_ratio = n_neg / max(n_pos, 1)
 
+    cw_note = "Class weight: balanced (sklearn class_weight='balanced')." if results.get("class_weight") == "balanced" else ""
     lines = [
         "=" * 60,
-        "DECISION TREE — RESULTS (Adult Income)",
+        "DECISION TREE — RESULTS (Adult Income)" + (" [class_weight=balanced]" if results.get("class_weight") == "balanced" else ""),
         "=" * 60,
         "",
         "--- DATA & METHODOLOGY ---",
         "Target: class (<=50K vs >50K); task: binary classification.",
+        cw_note if cw_note else "",
         "Metrics: F1, Accuracy, PR-AUC — imbalance makes accuracy insufficient;",
         "         F1 and PR-AUC better reflect minority-class performance.",
         f"Class distribution (train): {n_neg} <=50K, {n_pos} >50K (~{imbalance_ratio:.2f}:1).",
@@ -368,6 +407,6 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
         "",
         "=" * 60,
     ]
-    path = DT_RESULTS_PATH
+    path = DT_RESULTS_PATH if results.get("class_weight") != "balanced" else DT_RESULTS_PATH.replace(".txt", "_class_weight.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

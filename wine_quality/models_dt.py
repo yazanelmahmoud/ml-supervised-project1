@@ -58,15 +58,15 @@ def _train_and_eval(clf, X_tr, y_tr, X_te, y_te):
     return metrics, y_pred, y_proba, fit_time, predict_time
 
 
-def run_dt(X_train, y_train, X_test, y_test, cv=5):
+def run_dt(X_train, y_train, X_test, y_test, cv=5, class_weight='balanced'):
     """
     Train and tune DT (ccp_alpha, max_depth, min_samples_leaf) via CV on training only.
-    Uses class_weight='balanced' to handle severe class imbalance.
-    Compute learning/model-complexity curves, runtime.
-    Returns dict with all results and saves to DT_results.txt.
+    class_weight: 'balanced' (default) or None for no class weighting.
+    Returns dict with all results and saves to DT_results.txt (or DT_results_no_weights.txt when class_weight=None).
     """
     results = {}
     np.random.seed(RANDOM_SEED)
+    cw_kw = {} if class_weight is None else {"class_weight": class_weight}
 
     # 1) Grid search: tune ccp_alpha, max_depth, min_samples_leaf via CV on training only
     # Use f1_macro scoring for multiclass
@@ -76,9 +76,9 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         "min_samples_leaf": MIN_SAMPLES_LEAF,
     }
     base_clf = DecisionTreeClassifier(
-        criterion=CRITERION, 
+        criterion=CRITERION,
         random_state=RANDOM_SEED,
-        class_weight='balanced'  # Handle severe class imbalance
+        **cw_kw,
     )
     cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
     gs = GridSearchCV(base_clf, param_grid, cv=cv_splitter, scoring="f1_macro", n_jobs=-1)
@@ -99,7 +99,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=None,
             min_samples_leaf=1,
             random_state=RANDOM_SEED,
-            class_weight='balanced'
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro")
         mc_cross_val_f1.append(scores.mean())
@@ -125,7 +125,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=depth,
             min_samples_leaf=1,
             random_state=RANDOM_SEED,
-            class_weight='balanced'
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro")
         mc_md_cross_val_f1.append(scores.mean())
@@ -151,7 +151,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
             max_depth=None,
             min_samples_leaf=msl,
             random_state=RANDOM_SEED,
-            class_weight='balanced'
+            **cw_kw,
         )
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1_macro")
         mc_msl_cross_val_f1.append(scores.mean())
@@ -176,7 +176,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         max_depth=best_max_depth,
         min_samples_leaf=best_min_samples,
         random_state=RANDOM_SEED,
-        class_weight='balanced'
+        **cw_kw,
     )
     lc_sizes, lc_train, lc_cross_val = learning_curve(
         best_clf_base,
@@ -198,7 +198,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         max_depth=best_max_depth,
         min_samples_leaf=best_min_samples,
         random_state=RANDOM_SEED,
-        class_weight='balanced'
+        **cw_kw,
     )
     metrics, y_pred, y_proba, fit_time, predict_time = _train_and_eval(
         clf_final, X_train, y_train, X_test, y_test
@@ -211,8 +211,9 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
         "ccp_alpha": best_ccp,
         "max_depth": best_max_depth,
         "min_samples_leaf": best_min_samples,
-        "class_weight": "balanced"
+        "class_weight": class_weight,
     }
+    results["class_weight"] = class_weight
     results["depth"] = int(clf_final.get_depth())
     results["n_leaves"] = int(clf_final.get_n_leaves())
     results["test_metrics"] = metrics
@@ -226,6 +227,7 @@ def run_dt(X_train, y_train, X_test, y_test, cv=5):
 
 def _plot_and_print(results):
     """Plot learning curve and three model-complexity curves (ccp_alpha, max_depth, min_samples_leaf)."""
+    cw_suffix = " (no class weight)" if results.get("class_weight") is None else ""
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Top-left: Learning curve
@@ -241,7 +243,7 @@ def _plot_and_print(results):
         np.array(lc["cross_val_f1_macro_mean"]) + np.array(lc["cross_val_f1_macro_std"]), alpha=0.2)
     ax.set_xlabel("Training size")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("DT Learning Curve")
+    ax.set_title("DT Learning Curve" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -254,7 +256,7 @@ def _plot_and_print(results):
     ax.axvline(mc["best_ccp_alpha_from_curve"], color="gray", ls="--", label="best")
     ax.set_xlabel("ccp_alpha")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("DT Model-Complexity (ccp_alpha)")
+    ax.set_title("DT Model-Complexity (ccp_alpha)" + cw_suffix)
     ax.set_xscale("symlog", linthresh=1e-5)
     ax.set_xlim(left=0)
     ax.legend()
@@ -273,7 +275,7 @@ def _plot_and_print(results):
     ax.set_xticklabels([str(d) if d is not None else "None" for d in depths], rotation=45)
     ax.set_xlabel("max_depth")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("DT Model-Complexity (max_depth)")
+    ax.set_title("DT Model-Complexity (max_depth)" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -285,12 +287,14 @@ def _plot_and_print(results):
     ax.axvline(mc_msl["best_min_samples_leaf_from_curve"], color="gray", ls="--", label="best")
     ax.set_xlabel("min_samples_leaf")
     ax.set_ylabel("Macro-F1")
-    ax.set_title("DT Model-Complexity (min_samples_leaf)")
+    ax.set_title("DT Model-Complexity (min_samples_leaf)" + cw_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(os.path.dirname(DT_RESULTS_PATH), "outputs", "dt_curves.png"), dpi=150, bbox_inches="tight")
+    out_dir = os.path.join(os.path.dirname(DT_RESULTS_PATH), "outputs")
+    plot_suffix = "_no_weights" if results.get("class_weight") is None else ""
+    plt.savefig(os.path.join(out_dir, f"dt_curves{plot_suffix}.png"), dpi=150, bbox_inches="tight")
     plt.show()
 
     # Confusion matrix heatmap
@@ -299,9 +303,9 @@ def _plot_and_print(results):
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, cbar_kws={'label': 'Count'})
     ax.set_xlabel('Predicted Quality')
     ax.set_ylabel('True Quality')
-    ax.set_title('Decision Tree Confusion Matrix')
+    ax.set_title('Decision Tree Confusion Matrix' + cw_suffix)
     plt.tight_layout()
-    plt.savefig(os.path.join(os.path.dirname(DT_RESULTS_PATH), "outputs", "dt_confusion_matrix.png"), dpi=150, bbox_inches="tight")
+    plt.savefig(os.path.join(out_dir, f"dt_confusion_matrix{plot_suffix}.png"), dpi=150, bbox_inches="tight")
     plt.show()
 
     # Print summary
@@ -324,7 +328,8 @@ def _plot_and_print(results):
     print("Runtime - fit:", round(results["runtime"]["fit_sec"], 4), "s | predict:", round(results["runtime"]["predict_sec"], 4), "s")
     print("\nConfusion matrix:")
     print(np.array(results["confusion_matrix"]))
-    print("\nResults saved to:", DT_RESULTS_PATH)
+    _path = DT_RESULTS_PATH.replace(".txt", "_no_weights.txt") if results.get("class_weight") is None else DT_RESULTS_PATH
+    print("\nResults saved to:", _path)
 
 
 def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
@@ -344,9 +349,11 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
     f1_per_class = m.get("f1_per_class", {})
     class_report = m.get("classification_report", {})
 
+    cw_note = "No class weighting." if results.get("class_weight") is None else "Class weighting: 'balanced' used to handle severe imbalance."
+    path = DT_RESULTS_PATH.replace(".txt", "_no_weights.txt") if results.get("class_weight") is None else DT_RESULTS_PATH
     lines = [
         "=" * 60,
-        "DECISION TREE — RESULTS (Wine Quality)",
+        "DECISION TREE — RESULTS (Wine Quality)" + (" [no class weight]" if results.get("class_weight") is None else ""),
         "=" * 60,
         "",
         "--- DATA & METHODOLOGY ---",
@@ -359,7 +366,7 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
         "                   majority class (4) represents 34.6%.",
         "Leakage controls: 'class' column dropped (perfect correlation with 'quality').",
         "Single held-out test split; tuning via 5-fold CV on training only.",
-        "Class weighting: 'balanced' used to handle severe imbalance.",
+        cw_note,
         "",
         "--- Split criterion and justification ---",
         f"Criterion: {CRITERION}. Gini is faster than entropy and yields similar splits;",
@@ -369,7 +376,7 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
         f"ccp_alpha: {bp['ccp_alpha']:.6f}",
         f"max_depth: {bp['max_depth']}",
         f"min_samples_leaf: {bp['min_samples_leaf']}",
-        f"class_weight: {bp['class_weight']}",
+        f"class_weight: {bp.get('class_weight', 'N/A')}",
         f"Final depth: {results['depth']}",
         f"Number of leaves: {results['n_leaves']}",
         "",
@@ -425,8 +432,7 @@ def save_results(results, X_train, y_train, X_test, y_test, y_pred, y_proba):
         "",
         "=" * 60,
     ])
-    
-    path = DT_RESULTS_PATH
+
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 

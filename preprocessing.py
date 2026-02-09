@@ -48,7 +48,10 @@ def prepare_X_y(df, target_encodings=None, scaler=None, ohe=None, fit=True):
     y = encode_target(df[TARGET_COLUMN])
     X_df = df.drop(columns=[TARGET_COLUMN])
 
-    X_num = X_df[NUMERIC_FEATURES].astype(np.float32)
+    X_num = X_df[NUMERIC_FEATURES].astype(np.float32).copy()
+    # Log1p transform for right-skewed, zero-inflated capital-gain/capital-loss
+    X_num["capital-gain"] = np.log1p(X_num["capital-gain"])
+    X_num["capital-loss"] = np.log1p(X_num["capital-loss"])
     X_ohe = X_df[CATEGORICAL_ONEHOT].astype(str)
 
     if fit:

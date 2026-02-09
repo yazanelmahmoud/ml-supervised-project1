@@ -28,7 +28,7 @@ from evaluation import score_multiclass
 NN_SKLEARN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NN_sklearn_results.txt")
 
 # Step 1 — Width search
-WIDTH_VALUES = [8, 16, 32, 64, 128]
+WIDTH_VALUES = [8, 16, 32, 64, 128, 200, 400, 700]
 # Step 2 — Depth vs width: [64], [32,32], [16,16,16,16]
 STEP2_ARCHITECTURES = [(64,), (32, 32), (16, 16, 16, 16)]
 # Step 3 — LR sweep

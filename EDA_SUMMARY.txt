@@ -218,6 +218,11 @@ int32). The same preprocessing is applied to all models on the full dataset,
 with a single stratified train/test split (fixed seed) and cross-validation on
 training data only for hyperparameter tuning.
 
-NB : Talk about correlations and about log transform for capital loss gain. 
+Capital-gain and capital-loss are extremely right-skewed with most values at
+zero and a few very large outliers, which can disproportionately influence
+models that rely on distances or linear relationships. Applying a log1p
+transform compresses those extreme values and stabilizes the variance, helping
+the model learn patterns more effectively without being dominated by rare high
+amounts; this transform is applied in preprocessing before scaling.
 
 ================================================================================

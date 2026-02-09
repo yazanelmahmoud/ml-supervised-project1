@@ -48,20 +48,20 @@ Missing values (after treating '?' as NaN in object columns):
 
 Dtypes:
 age               float64
-workclass             str
+workclass          object
 fnlwgt            float64
-education             str
+education          object
 education-num     float64
-marital-status        str
-occupation            str
-relationship          str
-race                  str
-sex                   str
+marital-status     object
+occupation         object
+relationship       object
+race               object
+sex                object
 capital-gain      float64
 capital-loss      float64
 hours-per-week    float64
-native-country        str
-class                 str
+native-country     object
+class              object
 
 ----------------------------------------
 
@@ -230,8 +230,8 @@ Greece                           49
 Nicaragua                        48
 Peru                             45
 Ecuador                          43
-Ireland                          36
 France                           36
+Ireland                          36
 Thailand                         29
 Hong                             28
 Cambodia                         26

@@ -13,6 +13,7 @@ import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, learning_curve
 from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, average_precision_score
+from sklearn.utils.class_weight import compute_sample_weight
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -22,8 +23,19 @@ from config import RANDOM_SEED, OUTPUT_DIR
 # Results file (sklearn pipeline)
 NN_SKLEARN_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NN_sklearn_results.txt")
 
+
+def _nn_results_path(use_class_weight):
+    """Path for results file when use_class_weight=True."""
+    return NN_SKLEARN_RESULTS_PATH.replace(".txt", "_class_weight.txt") if use_class_weight else NN_SKLEARN_RESULTS_PATH
+
+
+def _nn_plot_suffix(use_class_weight):
+    """Filename suffix for plots when use_class_weight=True."""
+    return "_class_weight" if use_class_weight else ""
+
+
 # Step 1 — Width search (NN_strategy.txt)
-WIDTH_VALUES = [8, 16, 32, 64, 128]
+WIDTH_VALUES = [8, 16, 32, 64, 128, 200, 400, 700]
 # Step 2 — Depth vs width: [64], [32,32], [16,16,16,16]
 STEP2_ARCHITECTURES = [(64,), (32, 32), (16, 16, 16, 16)]
 # Step 3 — LR sweep
@@ -38,42 +50,56 @@ CV_SPLITS = 5
 N_JOBS = -1  # Use all CPU cores for parallel CV
 
 
-def _fit_one_fold_width(w, max_iter, train_idx, val_idx, X_train, y_train):
+def _fit_one_fold_width(w, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight=False):
     """Fit one (width, fold); return (train_f1, val_f1). Picklable for joblib."""
     X_tr = X_train[train_idx]
     X_val = X_train[val_idx]
     y_tr = y_train[train_idx]
     y_val = y_train[val_idx]
     clf = _make_mlp((w,), max_iter=max_iter)
-    clf.fit(X_tr, y_tr)
+    if use_class_weight:
+        sw = compute_sample_weight("balanced", y_tr)
+        clf.fit(X_tr, y_tr, sample_weight=sw)
+    else:
+        clf.fit(X_tr, y_tr)
     return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
 
 
-def _fit_one_fold_arch(arch, max_iter, train_idx, val_idx, X_train, y_train):
+def _fit_one_fold_arch(arch, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight=False):
     """Fit one (arch, fold); return (train_f1, val_f1). Picklable for joblib."""
     X_tr = X_train[train_idx]
     X_val = X_train[val_idx]
     y_tr = y_train[train_idx]
     y_val = y_train[val_idx]
     clf = _make_mlp(arch, max_iter=max_iter)
-    clf.fit(X_tr, y_tr)
+    if use_class_weight:
+        sw = compute_sample_weight("balanced", y_tr)
+        clf.fit(X_tr, y_tr, sample_weight=sw)
+    else:
+        clf.fit(X_tr, y_tr)
     return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
 
 
-def _fit_one_fold_lr(arch, lr, max_iter, train_idx, val_idx, X_train, y_train):
+def _fit_one_fold_lr(arch, lr, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight=False):
     """Fit one (lr, fold); return (train_f1, val_f1). Picklable for joblib."""
     X_tr = X_train[train_idx]
     X_val = X_train[val_idx]
     y_tr = y_train[train_idx]
     y_val = y_train[val_idx]
     clf = _make_mlp(arch, learning_rate_init=lr, max_iter=max_iter)
-    clf.fit(X_tr, y_tr)
+    if use_class_weight:
+        sw = compute_sample_weight("balanced", y_tr)
+        clf.fit(X_tr, y_tr, sample_weight=sw)
+    else:
+        clf.fit(X_tr, y_tr)
     return (f1_score(y_tr, clf.predict(X_tr), zero_division=0), f1_score(y_val, clf.predict(X_val), zero_division=0))
 
 
-def _append_nn_results(text):
-    """Append a line or block to NN_sklearn_results.txt."""
-    with open(NN_SKLEARN_RESULTS_PATH, "a", encoding="utf-8") as f:
+def _append_nn_results(text, path=None):
+    """Append a line or block to NN_sklearn_results.txt (or path when given)."""
+    if path is None:
+        path = NN_SKLEARN_RESULTS_PATH
+    with open(path, "a", encoding="utf-8") as f:
         f.write(text if text.endswith("\n") else text + "\n")
 
 
@@ -101,18 +127,15 @@ def _make_mlp(hidden_layer_sizes, learning_rate_init=NN_LR, alpha=NN_L2, max_ite
     )
 
 
-def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
+def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS, use_class_weight=False):
     """
     Step 1 — Width search (1 hidden layer).
-    Architecture: Input → Dense(W) → ReLU → Output.
-    Uses stratified K-fold CV on training set (like SVM/kNN/DT).
-    For each width: mean train F1 and mean CV F1; plot Model Complexity Curve.
-    Returns dict with widths, train_f1, cv_f1, best_width.
+    use_class_weight: if True, use sample_weight='balanced' in fit (for class imbalance).
     """
     np.random.seed(RANDOM_SEED)
-    # Start fresh results file for this pipeline run
-    with open(NN_SKLEARN_RESULTS_PATH, "w", encoding="utf-8") as f:
-        f.write("NN (sklearn) pipeline results\n")
+    results_path = _nn_results_path(use_class_weight)
+    with open(results_path, "w", encoding="utf-8") as f:
+        f.write("NN (sklearn) pipeline results" + (" [class_weight=balanced]" if use_class_weight else "") + "\n")
         f.write("============================\n\n")
     X_train = np.asarray(X_train)
     y_train = np.asarray(y_train).ravel()
@@ -127,7 +150,7 @@ def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
         for train_idx, val_idx in folds_list
     ]
     results = Parallel(n_jobs=N_JOBS)(
-        delayed(_fit_one_fold_width)(w, max_iter, train_idx, val_idx, X_train, y_train)
+        delayed(_fit_one_fold_width)(w, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight)
         for w, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN width sweep", total=len(tasks))
     )
     # Aggregate by width (same order as WIDTH_VALUES)
@@ -148,6 +171,7 @@ def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
         "train_f1": train_f1_list,
         "cv_f1": cv_f1_list,
         "best_width": best_width,
+        "use_class_weight": use_class_weight,
     }
     _plot_nn_step1(results)
     _write_step1_results(results)
@@ -156,17 +180,19 @@ def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
 
 def _plot_nn_step1(results):
     """Model Complexity Curve: X=width, Y=train + CV F1 (mean over folds)."""
+    suffix = _nn_plot_suffix(results.get("use_class_weight", False))
+    title_suffix = " (class_weight=balanced)" if results.get("use_class_weight") else ""
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
     ax.plot(results["widths"], results["train_f1"], "o-", label="Train F1 (mean CV)")
     ax.plot(results["widths"], results["cv_f1"], "s-", label="Cross-Val F1")
     ax.axvline(results["best_width"], color="gray", ls="--", alpha=0.7, label=f"best width={results['best_width']}")
     ax.set_xlabel("Hidden layer width")
     ax.set_ylabel("F1")
-    ax.set_title("NN Step 1 — Model Complexity (width, 1 hidden layer)")
+    ax.set_title("NN Step 1 — Model Complexity (width, 1 hidden layer)" + title_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "nn_width_model_complexity.png")
+    out_path = os.path.join(OUTPUT_DIR, f"nn_width_model_complexity{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
@@ -174,6 +200,7 @@ def _plot_nn_step1(results):
 
 def _write_step1_results(results):
     """Write Step 1 summary to NN_sklearn_results.txt."""
+    path = _nn_results_path(results.get("use_class_weight", False))
     lines = [
         "",
         "========== NN (sklearn) Step 1 — Width search ==========",
@@ -183,17 +210,17 @@ def _write_step1_results(results):
         f"Best width: {results['best_width']}",
         "",
     ]
-    _append_nn_results("\n".join(lines))
+    _append_nn_results("\n".join(lines), path=path)
     print(f"Step 1 best width: {results['best_width']}")
-    print(f"Appended to: {NN_SKLEARN_RESULTS_PATH}")
+    print(f"Appended to: {path}")
 
 
 def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
     """
     Step 2 — Depth vs width: [256], [128,128], [64,64,64].
-    Stratified K-fold CV; plot Model Complexity (number of layers vs F1).
-    Returns dict with best_architecture, step1, and curve data.
+    use_class_weight is taken from nn_step1 when present.
     """
+    use_class_weight = nn_step1.get("use_class_weight", False)
     np.random.seed(RANDOM_SEED)
     X_train = np.asarray(X_train)
     y_train = np.asarray(y_train).ravel()
@@ -209,7 +236,7 @@ def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
         for train_idx, val_idx in folds_list
     ]
     results = Parallel(n_jobs=N_JOBS)(
-        delayed(_fit_one_fold_arch)(arch, max_iter, train_idx, val_idx, X_train, y_train)
+        delayed(_fit_one_fold_arch)(arch, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight)
         for arch, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN step2 depth sweep", total=len(tasks))
     )
     by_arch = defaultdict(lambda: {"train": [], "val": []})
@@ -232,6 +259,7 @@ def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
         "cv_f1": cv_f1_list,
         "best_architecture": best_architecture,
         "step1": nn_step1,
+        "use_class_weight": use_class_weight,
     }
     _plot_nn_step2(results)
     _write_step2_results(results)
@@ -240,6 +268,8 @@ def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
 
 def _plot_nn_step2(results):
     """Model Complexity: X=number of layers, Y=train + CV F1."""
+    suffix = _nn_plot_suffix(results.get("use_class_weight", False))
+    title_suffix = " (class_weight=balanced)" if results.get("use_class_weight") else ""
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
     ax.plot(results["n_layers"], results["train_f1"], "o-", label="Train F1 (mean CV)")
     ax.plot(results["n_layers"], results["cv_f1"], "s-", label="Cross-Val F1")
@@ -247,12 +277,12 @@ def _plot_nn_step2(results):
     ax.axvline(best_n, color="gray", ls="--", alpha=0.7, label=f"best n_layers={best_n}")
     ax.set_xlabel("Number of hidden layers")
     ax.set_ylabel("F1")
-    ax.set_title("NN Step 2 — Model Complexity (depth)")
+    ax.set_title("NN Step 2 — Model Complexity (depth)" + title_suffix)
     ax.set_xticks(results["n_layers"])
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "nn_depth_model_complexity.png")
+    out_path = os.path.join(OUTPUT_DIR, f"nn_depth_model_complexity{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
@@ -260,6 +290,7 @@ def _plot_nn_step2(results):
 
 def _write_step2_results(results):
     """Write Step 2 summary to NN_sklearn_results.txt."""
+    path = _nn_results_path(results.get("use_class_weight", False))
     arch_str = [list(a) for a in results["architectures"]]
     lines = [
         "========== NN (sklearn) Step 2 — Depth vs width ==========",
@@ -269,17 +300,17 @@ def _write_step2_results(results):
         f"Best architecture: {list(results['best_architecture'])}",
         "",
     ]
-    _append_nn_results("\n".join(lines))
+    _append_nn_results("\n".join(lines), path=path)
     print(f"Step 2 best architecture: {list(results['best_architecture'])}")
-    print(f"Appended to: {NN_SKLEARN_RESULTS_PATH}")
+    print(f"Appended to: {path}")
 
 
 def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
     """
     Step 3 — Learning rate sweep with best architecture from Step 2.
-    Test LR: [0.1, 0.01, 0.001, 0.0003]. Plot LR vs F1 and epoch (training loss) curve.
-    Returns dict with best_lr, best_architecture, and curve data.
+    use_class_weight is taken from nn_step2 when present.
     """
+    use_class_weight = nn_step2.get("use_class_weight", False)
     np.random.seed(RANDOM_SEED)
     X_train = np.asarray(X_train)
     y_train = np.asarray(y_train).ravel()
@@ -295,7 +326,7 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
         for train_idx, val_idx in folds_list
     ]
     results = Parallel(n_jobs=N_JOBS)(
-        delayed(_fit_one_fold_lr)(best_arch, lr, max_iter, train_idx, val_idx, X_train, y_train)
+        delayed(_fit_one_fold_lr)(best_arch, lr, max_iter, train_idx, val_idx, X_train, y_train, use_class_weight)
         for best_arch, lr, max_iter, train_idx, val_idx in tqdm(tasks, desc="NN step3 LR sweep", total=len(tasks))
     )
     by_lr = defaultdict(lambda: {"train": [], "val": []})
@@ -313,7 +344,11 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
     best_lr = STEP3_LR_VALUES[best_idx]
     # Epoch curve: fit once with best_lr on full train to get loss_curve_
     clf_best = _make_mlp(best_arch, learning_rate_init=best_lr, max_iter=max_iter)
-    clf_best.fit(X_train, y_train)
+    if use_class_weight:
+        sw = compute_sample_weight("balanced", y_train)
+        clf_best.fit(X_train, y_train, sample_weight=sw)
+    else:
+        clf_best.fit(X_train, y_train)
     loss_curve_for_plot = clf_best.loss_curve_
 
     results = {
@@ -324,6 +359,7 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
         "best_architecture": best_arch,
         "loss_curve": loss_curve_for_plot,
         "step2": nn_step2,
+        "use_class_weight": use_class_weight,
     }
     _plot_nn_step3(results)
     _write_step3_results(results)
@@ -333,6 +369,8 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
 
 def _plot_nn_step3(results):
     """LR vs F1 (model complexity) and training loss vs iteration (epoch curve)."""
+    suffix = _nn_plot_suffix(results.get("use_class_weight", False))
+    title_suffix = " (class_weight=balanced)" if results.get("use_class_weight") else ""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     ax = axes[0]
     ax.plot(results["lr_values"], results["train_f1"], "o-", label="Train F1 (mean CV)")
@@ -341,7 +379,7 @@ def _plot_nn_step3(results):
     ax.set_xlabel("Learning rate")
     ax.set_ylabel("F1")
     ax.set_xscale("log")
-    ax.set_title("NN Step 3 — Model Complexity (LR)")
+    ax.set_title("NN Step 3 — Model Complexity (LR)" + title_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -349,11 +387,11 @@ def _plot_nn_step3(results):
     ax.plot(results["loss_curve"], color="C0", label="Train loss")
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Loss")
-    ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)")
+    ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)" + title_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "nn_lr_curves.png")
+    out_path = os.path.join(OUTPUT_DIR, f"nn_lr_curves{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
@@ -361,6 +399,7 @@ def _plot_nn_step3(results):
 
 def _write_step3_results(results):
     """Write Step 3 summary to NN_sklearn_results.txt."""
+    path = _nn_results_path(results.get("use_class_weight", False))
     lines = [
         "========== NN (sklearn) Step 3 — Learning rate sweep ==========",
         f"LR values: {results['lr_values']}",
@@ -369,13 +408,14 @@ def _write_step3_results(results):
         f"Best LR: {results['best_lr']}",
         "",
     ]
-    _append_nn_results("\n".join(lines))
+    _append_nn_results("\n".join(lines), path=path)
     print(f"Step 3 best LR: {results['best_lr']}")
-    print(f"Appended to: {NN_SKLEARN_RESULTS_PATH}")
+    print(f"Appended to: {path}")
 
 
 def _write_best_model_summary(results):
     """Write best model summary to NN_sklearn_results.txt."""
+    path = _nn_results_path(results.get("use_class_weight", False))
     lines = [
         "========== NN (sklearn) Best model ==========",
         f"Best architecture (from Step 2): {list(results['best_architecture'])}",
@@ -383,7 +423,7 @@ def _write_best_model_summary(results):
         f"Fixed: L2={NN_L2}, batch_size={BATCH_SIZE}, early_stopping_patience={EARLY_STOPPING_PATIENCE}",
         "",
     ]
-    _append_nn_results("\n".join(lines))
+    _append_nn_results("\n".join(lines), path=path)
     print("Best model — architecture:", list(results["best_architecture"]), "| LR:", results["best_lr"])
 
 
@@ -394,9 +434,9 @@ LEARNING_CURVE_TRAIN_SIZES = [0.1, 0.25, 0.5, 0.75, 1.0]
 def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     """
     Step 4 — Final model: retrain with best arch + best LR.
-    Generate: learning curve, confusion matrix, runtime table.
-    Save test set metrics and all outputs to NN_sklearn_results.txt.
+    use_class_weight is taken from nn_step3 when present.
     """
+    use_class_weight = nn_step3.get("use_class_weight", False)
     np.random.seed(RANDOM_SEED)
     X_train = np.asarray(X_train)
     y_train = np.asarray(y_train).ravel()
@@ -422,12 +462,16 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     )
     train_scores_mean = np.mean(train_scores, axis=1)
     val_scores_mean = np.mean(val_scores, axis=1)
-    _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean)
+    _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean, use_class_weight=use_class_weight)
 
     # 2) Retrain final model on full train; measure fit time
     clf_final = _make_mlp(best_arch, learning_rate_init=best_lr, max_iter=max_iter)
     t0 = time.perf_counter()
-    clf_final.fit(X_train, y_train)
+    if use_class_weight:
+        sw = compute_sample_weight("balanced", y_train)
+        clf_final.fit(X_train, y_train, sample_weight=sw)
+    else:
+        clf_final.fit(X_train, y_train)
     fit_time = time.perf_counter() - t0
 
     # Predict on test; measure predict time
@@ -440,7 +484,7 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
 
     # 3) Confusion matrix
     cm = confusion_matrix(y_test, y_pred)
-    _plot_confusion_matrix(cm, y_test, y_pred)
+    _plot_confusion_matrix(cm, y_test, y_pred, use_class_weight=use_class_weight)
 
     # 4) Test set metrics
     test_accuracy = float(accuracy_score(y_test, y_pred))
@@ -458,6 +502,7 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
         learning_curve_sizes=train_sizes_abs.tolist(),
         learning_curve_train=train_scores_mean.tolist(),
         learning_curve_val=val_scores_mean.tolist(),
+        use_class_weight=use_class_weight,
     )
     print("Step 4 done. Test F1:", round(test_f1, 4), "| Fit time:", round(fit_time, 3), "s")
     return {
@@ -471,25 +516,29 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     }
 
 
-def _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean):
+def _plot_learning_curve(train_sizes_abs, train_scores_mean, val_scores_mean, use_class_weight=False):
     """Plot learning curve: X=training size, Y=train + validation F1."""
+    suffix = _nn_plot_suffix(use_class_weight)
+    title_suffix = " (class_weight=balanced)" if use_class_weight else ""
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
     ax.plot(train_sizes_abs, train_scores_mean, "o-", label="Train F1")
     ax.plot(train_sizes_abs, val_scores_mean, "s-", label="Validation F1")
     ax.set_xlabel("Training set size")
     ax.set_ylabel("F1")
-    ax.set_title("NN Step 4 — Learning curve")
+    ax.set_title("NN Step 4 — Learning curve" + title_suffix)
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "nn_learning_curve.png")
+    out_path = os.path.join(OUTPUT_DIR, f"nn_learning_curve{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
 
 
-def _plot_confusion_matrix(cm, y_test, y_pred):
+def _plot_confusion_matrix(cm, y_test, y_pred, use_class_weight=False):
     """Plot confusion matrix and save to outputs/."""
+    suffix = _nn_plot_suffix(use_class_weight)
+    title_suffix = " (class_weight=balanced)" if use_class_weight else ""
     fig, ax = plt.subplots(1, 1, figsize=(5, 4))
     labels = sorted(set(y_test) | set(y_pred))
     disp = ax.imshow(cm, cmap="Blues")
@@ -499,12 +548,12 @@ def _plot_confusion_matrix(cm, y_test, y_pred):
     ax.set_yticklabels(labels)
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("NN Step 4 — Confusion matrix (test set)")
+    ax.set_title("NN Step 4 — Confusion matrix (test set)" + title_suffix)
     for i in range(len(labels)):
         for j in range(len(labels)):
             ax.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
     plt.tight_layout()
-    out_path = os.path.join(OUTPUT_DIR, "nn_confusion_matrix.png")
+    out_path = os.path.join(OUTPUT_DIR, f"nn_confusion_matrix{suffix}.png")
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.show()
     print("Saved:", out_path)
@@ -520,8 +569,10 @@ def _write_step4_results(
     learning_curve_sizes,
     learning_curve_train,
     learning_curve_val,
+    use_class_weight=False,
 ):
     """Append Step 4 results to NN_sklearn_results.txt."""
+    path = _nn_results_path(use_class_weight)
     lines = [
         "",
         "========== NN (sklearn) Step 4 — Final model (test set) ==========",
@@ -544,4 +595,4 @@ def _write_step4_results(
         f"  Predict time: {predict_time:.4f} s",
         "",
     ]
-    _append_nn_results("\n".join(lines))
+    _append_nn_results("\n".join(lines), path=path)
