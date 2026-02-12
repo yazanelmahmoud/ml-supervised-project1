@@ -33,7 +33,7 @@ Accuracy: 0.8443
 F1: 0.6682
 PR-AUC: 0.7380
 Fit (sec): 0.0085
-Predict (sec): 1.7226
+Predict (sec): 1.9016
 Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 Confusion matrix (0=<=50K, 1=>50K): [[6211, 584], [823, 1417]]
 
