@@ -1,0 +1,55 @@
+============================================================
+DECISION TREE — RESULTS (Adult Income) [class_weight=balanced]
+============================================================
+
+--- DATA & METHODOLOGY ---
+Target: class (<=50K vs >50K); task: binary classification.
+Class weight: balanced (sklearn class_weight='balanced').
+Metrics: F1, Accuracy, PR-AUC — imbalance makes accuracy insufficient;
+         F1 and PR-AUC better reflect minority-class performance.
+Class distribution (train): 27178 <=50K, 8962 >50K (~3.03:1).
+Imbalance: minority class (>50K) under-represented; F1/PR-AUC preferred.
+Leakage controls: fnlwgt and education dropped (EDA: redundancy, near-zero correlation).
+Single held-out test split; tuning via 5-fold CV on training only.
+
+--- Split criterion and justification ---
+Criterion: gini. Gini is faster than entropy and yields similar splits;
+entropy slightly prefers balanced splits; for this dataset Gini is chosen for speed.
+
+--- Best hyperparameters (CV on training) ---
+ccp_alpha: 0.000187
+max_depth: 20
+min_samples_leaf: 4
+Final depth: 18
+Number of leaves: 91
+
+--- Best from each model-complexity curve (other params at standard) ---
+  ccp_alpha curve (max_depth=None, min_samples_leaf=1):
+    best ccp_alpha=0.000100, CV F1=0.6875
+  max_depth curve (ccp_alpha=0, min_samples_leaf=1):
+    best max_depth=10, CV F1=0.6837
+  min_samples_leaf curve (ccp_alpha=0, max_depth=None):
+    best min_samples_leaf=50, CV F1=0.6804
+
+--- Grid-search best (joint tuning, val F1) ---
+CV F1: 0.6888
+Params: {'ccp_alpha': 0.0001873817422860383, 'max_depth': 20, 'min_samples_leaf': 4}
+
+--- Test metrics ---
+Accuracy:  0.8133
+F1:        0.6914
+PR-AUC:    0.7746
+
+--- Confusion matrix (0=<=50K, 1=>50K, threshold 0.5) ---
+TN=5458  FP=1337
+FN=350  TP=1890
+
+--- Runtime ---
+Fit (sec):    0.1275
+Predict (sec): 0.0011
+Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+
+--- Note ---
+Revisit hypothesis from hypothesis.txt in DT conclusions.
+
+============================================================

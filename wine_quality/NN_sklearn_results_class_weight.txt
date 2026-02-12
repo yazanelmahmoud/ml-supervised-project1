@@ -1,0 +1,54 @@
+NN (sklearn) pipeline results — Wine Quality [class_weight=balanced]
+============================================================
+
+
+========== NN (sklearn) Step 1 — Width search ==========
+Widths: [8, 16, 32, 64, 128, 200, 400, 700]
+Mean train Macro-F1: [0.2183, 0.2968, 0.2784, 0.3505, 0.3253, 0.3545, 0.3626, 0.3688]
+Mean CV Macro-F1:    [0.2063, 0.2717, 0.2468, 0.3058, 0.2901, 0.3158, 0.3038, 0.3076]
+Best width: 200
+========== NN (sklearn) Step 2 — Depth vs width ==========
+Architectures: [[64], [32, 14], [28, 14, 8]]
+Mean train Macro-F1: [0.3505, 0.3236, 0.184]
+Mean CV Macro-F1:    [0.3058, 0.2847, 0.1589]
+Best architecture: [64]
+========== NN (sklearn) Step 3 — Learning rate sweep ==========
+LR values: [0.1, 0.01, 0.001, 0.0003]
+Mean train Macro-F1: [0.3982, 0.3505, 0.2686, 0.2386]
+Mean CV Macro-F1:    [0.3157, 0.3058, 0.2529, 0.2322]
+Best LR: 0.1
+========== NN (sklearn) Best model ==========
+Best architecture (from Step 2): [64]
+Best learning rate (from Step 3): 0.1
+Fixed: L2=0.0001, batch_size=64, early_stopping_patience=10
+Class weighting: sample_weight='balanced' in fit().
+
+========== NN (sklearn) Step 4 — Final model (test set) ==========
+
+Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):
+  Train sizes: [340, 851, 1702, 2553, 3404]
+  Train Macro-F1 (mean CV): [0.2555, 0.2707, 0.303, 0.3338, 0.3498]
+  Validation Macro-F1 (mean CV): [0.2209, 0.2559, 0.2926, 0.3205, 0.3256]
+
+Test set metrics:
+  Accuracy: 0.4276
+  Macro-F1: 0.3236
+  Weighted-F1: 0.4563
+
+--- Per-class performance (F1 scores and Accuracy) ---
+  Quality 1: F1 = 0.0435, Accuracy = 0.7500
+  Quality 2: F1 = 0.2791, Accuracy = 0.3871
+  Quality 3: F1 = 0.4476, Accuracy = 0.4051
+  Quality 4: F1 = 0.5039, Accuracy = 0.4429
+  Quality 5: F1 = 0.4612, Accuracy = 0.3992
+  Quality 6: F1 = 0.3985, Accuracy = 0.3910
+  Quality 7: F1 = 0.4553, Accuracy = 0.8235
+  Quality 8: F1 = 0.0000, Accuracy = 0.0000
+
+Confusion matrix (test set):
+  [[3, 0, 1, 0, 0, 0, 0, 0], [10, 12, 7, 2, 0, 0, 0, 0], [60, 28, 96, 44, 6, 3, 0, 0], [48, 14, 78, 163, 52, 12, 0, 1], [8, 1, 9, 61, 101, 56, 16, 1], [5, 0, 1, 9, 25, 52, 41, 0], [0, 0, 0, 0, 1, 5, 28, 0], [0, 0, 0, 0, 0, 0, 4, 0]]
+
+Runtime:
+  Fit time: 0.1365 s
+  Predict time: 0.0004 s
+  Hardware: Linux 6.14.0-1018-aws, CPU: x86_64

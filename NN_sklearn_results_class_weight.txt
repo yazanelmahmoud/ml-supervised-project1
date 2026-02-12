@@ -1,0 +1,42 @@
+NN (sklearn) pipeline results [class_weight=balanced]
+============================
+
+
+========== NN (sklearn) Step 1 — Width search ==========
+Widths: [8, 16, 32, 64, 128, 200, 400, 700]
+Mean train F1: [0.6826, 0.6815, 0.6793, 0.6843, 0.684, 0.6857, 0.6844, 0.6863]
+Mean CV F1:    [0.6805, 0.68, 0.6784, 0.6812, 0.6815, 0.6818, 0.6807, 0.6825]
+Best width: 700
+========== NN (sklearn) Step 2 — Depth vs width ==========
+Architectures: [[64], [32, 32], [16, 16, 16, 16]]
+Mean train F1: [0.6843, 0.6877, 0.6793]
+Mean CV F1:    [0.6812, 0.6844, 0.6781]
+Best architecture: [32, 32]
+========== NN (sklearn) Step 3 — Learning rate sweep ==========
+LR values: [0.1, 0.01, 0.001, 0.0003]
+Mean train F1: [0.6928, 0.6877, 0.6748, 0.6592]
+Mean CV F1:    [0.6832, 0.6844, 0.6715, 0.6588]
+Best LR: 0.01
+========== NN (sklearn) Best model ==========
+Best architecture (from Step 2): [32, 32]
+Best learning rate (from Step 3): 0.01
+Fixed: L2=0.0001, batch_size=64, early_stopping_patience=10
+
+========== NN (sklearn) Step 4 — Final model (test set) ==========
+
+Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):
+  Train sizes: [2891, 7228, 14456, 21684, 28912]
+  Train F1 (mean CV): [0.6558, 0.642, 0.6529, 0.6576, 0.6567]
+  Validation F1 (mean CV): [0.6226, 0.6323, 0.6487, 0.654, 0.6509]
+
+Test set metrics:
+  Accuracy: 0.7972
+  F1: 0.6786
+  PR-AUC (average_precision): 0.7565
+
+Confusion matrix (test set):
+  [[5269, 1526], [306, 1934]]
+
+Runtime:
+  Fit time: 2.8313 s
+  Predict time: 0.0013 s
