@@ -184,17 +184,16 @@ REPORT PARAGRAPH SECTION
 
 The Adult Income dataset contains 45,175 census records (15 columns) to predict
 income classification (<=50K vs >50K) [1]. We remove 47 exact duplicate rows to
-prevent data leakage. The dataset has no missing values after treating '?' as
-NaN. The target exhibits moderate class imbalance (75.2% vs 24.8%, ratio ~3:1),
+prevent data leakage. The dataset has no missing values. The target exhibits moderate class imbalance (75.2% vs 24.8%, ratio ~3:1),
 necessitating F1 and PR-AUC metrics alongside accuracy.
 
 We drop the education string column, retaining education-num (ordinal, 1-16) due
 to perfect one-to-one correspondence. We drop the fnlwgt column because of its
 near-zero correlation with the target (-0.0072) and because it is a sampling
-weight artifact with no predictive value. Final schema: 5 numeric features (age,
-education-num, capital-gain, capital-loss, hours-per-week) and 8 categorical
+weight artifact with no predictive value.
+Final schema: 5 numeric features (age, education-num, capital-gain, capital-loss, hours-per-week) and 8 categorical
 features (workclass, marital-status, occupation, relationship, race, sex,
-native-country, plus education-num treated categorically for encoding).
+native-country,).
 Native-country is high-cardinality (41 levels) with heavy sparsity (United-States
 dominates at 91.3%); we use target encoding rather than one-hot to avoid
 excessive dimensionality. Target encoding for native-country is fit only on the
@@ -225,4 +224,6 @@ transform compresses those extreme values and stabilizes the variance, helping
 the model learn patterns more effectively without being dominated by rare high
 amounts; this transform is applied in preprocessing before scaling.
 
+
+NB : Talk about correlations and about log transform for capital loss gain. 
 ================================================================================

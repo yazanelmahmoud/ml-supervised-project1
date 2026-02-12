@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold, learning_curve
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score
 
 from config import RANDOM_SEED, OUTPUT_DIR
 from evaluation import score_binary
@@ -34,7 +34,7 @@ def run_knn_step2(X_train, y_train, X_test, y_test, cv=5):
     Plot two panels (uniform | distance), each with euclidean + manhattan curves.
     Print table at k=K_REF_TABLE and best (k, weights, metric). Save to KNN_results.txt.
     """
-    results = {"weights_metric_curves": {}, "cv_f1_at_k": {}}
+    results = {"weights_metric_curves": {}, "train_f1_curves": {}, "cv_f1_at_k": {}}
     np.random.seed(RANDOM_SEED)
     cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_SEED)
 
@@ -42,11 +42,19 @@ def run_knn_step2(X_train, y_train, X_test, y_test, cv=5):
         for m in METRIC_OPTIONS:
             key = (w, m)
             cv_f1_list = []
+            train_f1_list = []
             for k in K_VALUES:
                 clf = KNeighborsClassifier(n_neighbors=k, weights=w, metric=m)
+                # Cross-validation score
                 scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1")
                 cv_f1_list.append(float(scores.mean()))
+                # Training score
+                clf.fit(X_train, y_train)
+                y_train_pred = clf.predict(X_train)
+                train_f1 = f1_score(y_train, y_train_pred)
+                train_f1_list.append(float(train_f1))
             results["weights_metric_curves"][key] = cv_f1_list
+            results["train_f1_curves"][key] = train_f1_list
 
     k_idx = K_VALUES.index(K_REF_TABLE) if K_REF_TABLE in K_VALUES else min(
         range(len(K_VALUES)), key=lambda i: abs(K_VALUES[i] - K_REF_TABLE)
@@ -75,14 +83,21 @@ def run_knn_step2(X_train, y_train, X_test, y_test, cv=5):
 
 
 def _plot(results):
-    """Two panels: uniform (k vs F1 for euclidean, manhattan); distance (same)."""
+    """Two panels: uniform (k vs F1 for euclidean, manhattan); distance (same).
+    Shows both training and cross-validation curves."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     k_vals = K_VALUES
     for ax, weights in zip(axes, WEIGHTS_OPTIONS):
         for m in METRIC_OPTIONS:
-            ax.plot(k_vals, results["weights_metric_curves"][(weights, m)], "o-", label=f"metric={m}")
+            key = (weights, m)
+            # Plot CV curve
+            ax.plot(k_vals, results["weights_metric_curves"][key], "o-", 
+                   label=f"CV (metric={m})", linestyle="--")
+            # Plot training curve
+            ax.plot(k_vals, results["train_f1_curves"][key], "s-", 
+                   label=f"Train (metric={m})", linestyle="-")
         ax.set_xlabel("n_neighbors (k)")
-        ax.set_ylabel("Cross-Val F1")
+        ax.set_ylabel("F1 Score")
         ax.set_title(f"kNN — weights={weights}")
         ax.legend()
         ax.grid(True, alpha=0.3)
