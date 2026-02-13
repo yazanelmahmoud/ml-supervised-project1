@@ -38,9 +38,9 @@ Confusion matrix (test set):
   [[6402, 393], [983, 1257]]
 
 Runtime:
-  Fit time: 1.7383 s
-  Predict time: 0.0016 s
+  Fit time: 1.7603 s
+  Predict time: 0.0013 s
 
 Training details:
-  Iterations used: 23 / 56500
+  Epochs used: 23 / 500
   Early stopping: Yes

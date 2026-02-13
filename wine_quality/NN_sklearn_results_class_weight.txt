@@ -49,10 +49,10 @@ Confusion matrix (test set):
   [[3, 0, 1, 0, 0, 0, 0, 0], [10, 12, 7, 2, 0, 0, 0, 0], [60, 28, 96, 44, 6, 3, 0, 0], [48, 14, 78, 163, 52, 12, 0, 1], [8, 1, 9, 61, 101, 56, 16, 1], [5, 0, 1, 9, 25, 52, 41, 0], [0, 0, 0, 0, 1, 5, 28, 0], [0, 0, 0, 0, 0, 0, 4, 0]]
 
 Runtime:
-  Fit time: 0.1365 s
+  Fit time: 0.1386 s
   Predict time: 0.0004 s
   Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 
 Training details:
-  Iterations used: 13 / 6700
+  Epochs used: 13 / 500
   Early stopping: Yes

@@ -123,8 +123,15 @@ def _append_nn_results(text, path=None):
 
 
 def _get_max_iter(n_samples):
-    """Max iterations for ~100 epochs with batch_size=64."""
-    return max(1000, 100 * ((n_samples + BATCH_SIZE - 1) // BATCH_SIZE))
+    """Max iterations (epochs) for SGD solver. 
+    Note: For SGD solver, max_iter counts epochs, not batch iterations.
+    For consistency with PyTorch which uses min(500, max(100, ...)), 
+    we use a similar maximum epoch limit."""
+    # PyTorch uses: max_epochs = min(500, max(100, n_samples // BATCH_SIZE * 100))
+    # But that formula seems to calculate batches*100, not epochs directly
+    # For sklearn, max_iter should be epochs directly, so we use a reasonable limit
+    # Use 500 epochs max to match PyTorch's cap, with minimum of 100
+    return 500  # Match PyTorch's maximum epoch limit
 
 
 def _iterations_per_epoch(n_samples):
@@ -411,9 +418,10 @@ def _plot_nn_step3(results):
     ax.grid(True, alpha=0.3)
 
     ax = axes[1]
-    n_samples = results.get("n_samples", 1)
-    iters_per_epoch = _iterations_per_epoch(n_samples)
-    epochs_x = np.arange(len(results["loss_curve"])) / iters_per_epoch
+    # Note: sklearn's loss_curve_ contains one value per epoch (n_iter_ epochs)
+    # For SGD solver, n_iter_ counts epochs, so loss_curve_ is already per epoch
+    # Use indices directly as epochs (0, 1, 2, ...) instead of dividing by iters_per_epoch
+    epochs_x = np.arange(len(results["loss_curve"]))
     ax.plot(epochs_x, results["loss_curve"], color="C0", label="Train loss")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
@@ -515,10 +523,13 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
 
     metrics = score_multiclass(y_test, y_pred, y_proba)
 
+    # Note: sklearn's n_iter_ counts epochs (not batch iterations) for SGD solver
+    # According to sklearn docs: "For stochastic solvers ('sgd', 'adam'), 
+    # note that this determines the number of epochs (how many times each data point will be used)"
     n_iter_used = clf_final.n_iter_ if hasattr(clf_final, 'n_iter_') else None
-    iters_per_epoch = _iterations_per_epoch(n_samples)
-    n_epochs_used = int(round(n_iter_used / iters_per_epoch)) if n_iter_used is not None else None
-    max_epochs = int(max_iter / iters_per_epoch)
+    # n_iter_ is already in epochs for SGD solver, so use it directly
+    n_epochs_used = n_iter_used if n_iter_used is not None else None
+    max_epochs = max_iter  # max_iter is also in epochs for SGD solver
     _write_step4_results(
         cm=cm,
         metrics=metrics,

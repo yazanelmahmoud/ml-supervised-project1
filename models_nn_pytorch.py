@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, average_precision_score
 from sklearn.utils.class_weight import compute_class_weight
 from joblib import Parallel, delayed
@@ -77,6 +77,7 @@ def _fit_one_fold(X_tr, y_tr, X_val, y_val, arch, lr, max_epochs, class_weight_t
     best_val_f1 = -1
     patience_counter = 0
     loss_curve = []
+    tol = 1e-4  # Same tolerance as sklearn
 
     for epoch in range(max_epochs):
         model.train()
@@ -98,7 +99,10 @@ def _fit_one_fold(X_tr, y_tr, X_val, y_val, arch, lr, max_epochs, class_weight_t
             pred_tr = model(torch.FloatTensor(X_tr).to(device)).argmax(dim=1).cpu().numpy()
             train_f1 = f1_score(y_tr, pred_tr, zero_division=0)
 
-        if val_f1 > best_val_f1:
+        # Early stopping: same logic as sklearn - stop if validation score doesn't improve by tol
+        # sklearn: stops if score < (best_score + tol) for n_iter_no_change epochs
+        # We use F1 instead of accuracy, but same logic: continue if val_f1 >= best_val_f1 + tol
+        if val_f1 >= best_val_f1 + tol:
             best_val_f1 = val_f1
             patience_counter = 0
         else:
@@ -193,8 +197,11 @@ def _append_results(text, path=NN_PYTORCH_RESULTS_PATH):
         f.write(text if text.endswith("\n") else text + "\n")
 
 
-def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
-    """Step 1 — Width search (1 hidden layer)."""
+def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS, use_class_weight=True):
+    """
+    Step 1 — Width search (1 hidden layer).
+    use_class_weight: PyTorch always uses class_weight='balanced' (ignored for compatibility with sklearn).
+    """
     X_train = np.asarray(X_train, dtype=np.float32)
     y_train = np.asarray(y_train).ravel().astype(np.int64)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -269,8 +276,11 @@ def _write_step1_results(results):
     print(f"Step 1 best width: {results['best_width']}")
 
 
-def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
-    """Step 2 — Depth vs width."""
+def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS, use_class_weight=True):
+    """
+    Step 2 — Depth vs width.
+    use_class_weight: PyTorch always uses class_weight='balanced' (ignored for compatibility with sklearn).
+    """
     X_train = np.asarray(X_train, dtype=np.float32)
     y_train = np.asarray(y_train).ravel().astype(np.int64)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -350,8 +360,11 @@ def _write_step2_results(results):
     _append_results("\n".join(lines))
 
 
-def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
-    """Step 3 — Learning rate sweep + epoch curve."""
+def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS, use_class_weight=True):
+    """
+    Step 3 — Learning rate sweep + epoch curve.
+    use_class_weight: PyTorch always uses class_weight='balanced' (ignored for compatibility with sklearn).
+    """
     X_train = np.asarray(X_train, dtype=np.float32)
     y_train = np.asarray(y_train).ravel().astype(np.int64)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -454,8 +467,11 @@ def _write_step3_results(results):
 LEARNING_CURVE_TRAIN_SIZES = [0.1, 0.25, 0.5, 0.75, 1.0]
 
 
-def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
-    """Step 4 — Learning curve, final model, confusion matrix."""
+def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS, use_class_weight=True):
+    """
+    Step 4 — Learning curve, final model, confusion matrix.
+    use_class_weight: PyTorch always uses class_weight='balanced' (ignored for compatibility with sklearn).
+    """
     X_train = np.asarray(X_train, dtype=np.float32)
     y_train = np.asarray(y_train).ravel().astype(np.int64)
     X_test = np.asarray(X_test, dtype=np.float32)
@@ -503,8 +519,16 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     ds = TensorDataset(torch.FloatTensor(X_train).to(device), torch.LongTensor(y_train).to(device))
     loader = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True)
 
-    # Early stopping for final model (similar to sklearn's tol-based stopping)
-    best_loss = float('inf')
+    # Early stopping for final model - same logic as sklearn
+    # sklearn uses validation score: stops if score < (best_score + tol) for n_iter_no_change epochs
+    # We create a validation set (10% like sklearn) and use validation F1 score
+    X_train_fit, X_val_fit, y_train_fit, y_val_fit = train_test_split(
+        X_train, y_train, test_size=0.1, random_state=RANDOM_SEED, stratify=y_train
+    )
+    ds_train = TensorDataset(torch.FloatTensor(X_train_fit).to(device), torch.LongTensor(y_train_fit).to(device))
+    loader_train = DataLoader(ds_train, batch_size=BATCH_SIZE, shuffle=True)
+    
+    best_val_f1 = -1
     patience_counter = 0
     tol = 1e-4  # Same tolerance as sklearn default
     n_epochs_used = 0
@@ -512,19 +536,24 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     t0 = time.perf_counter()
     for epoch in range(max_epochs):
         model.train()
-        epoch_loss = 0.0
-        for xb, yb in loader:
+        for xb, yb in loader_train:
             opt.zero_grad()
             loss = criterion(model(xb), yb)
             loss.backward()
             opt.step()
-            epoch_loss += loss.item()
-        avg_loss = epoch_loss / len(loader)
         n_epochs_used = epoch + 1
         
-        # Early stopping: stop if loss doesn't improve by tol for patience epochs
-        if avg_loss < best_loss - tol:
-            best_loss = avg_loss
+        # Evaluate on validation set (same as sklearn's early_stopping)
+        model.eval()
+        with torch.no_grad():
+            logits_val = model(torch.FloatTensor(X_val_fit).to(device))
+            pred_val = logits_val.argmax(dim=1).cpu().numpy()
+            val_f1 = f1_score(y_val_fit, pred_val, zero_division=0)
+        
+        # Early stopping: same logic as sklearn - stop if validation score doesn't improve by tol
+        # sklearn: stops if score < (best_score + tol) for n_iter_no_change epochs
+        if val_f1 >= best_val_f1 + tol:
+            best_val_f1 = val_f1
             patience_counter = 0
         else:
             patience_counter += 1
