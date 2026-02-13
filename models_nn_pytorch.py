@@ -423,7 +423,7 @@ def _plot_nn_step3(results):
     ax.grid(True, alpha=0.3)
     ax = axes[1]
     ax.plot(results["loss_curve"], color="C0", label="Train loss")
-    ax.set_xlabel("Iteration")
+    ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
     ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)")
     ax.legend()

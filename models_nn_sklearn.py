@@ -108,6 +108,12 @@ def _get_max_iter(n_samples):
     return max(1000, 100 * ((n_samples + BATCH_SIZE - 1) // BATCH_SIZE))
 
 
+def _iterations_per_epoch(n_samples):
+    """Iterations per epoch: sklearn uses validation_fraction=0.1, so train on 90%."""
+    n_train = max(1, int(0.9 * n_samples))
+    return max(1, (n_train + BATCH_SIZE - 1) // BATCH_SIZE)
+
+
 def _make_mlp(hidden_layer_sizes, learning_rate_init=NN_LR, alpha=NN_L2, max_iter=10000, random_state=RANDOM_SEED):
     """Build MLPClassifier with SGD, no momentum, early stopping."""
     return MLPClassifier(
@@ -358,6 +364,7 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
         "best_lr": best_lr,
         "best_architecture": best_arch,
         "loss_curve": loss_curve_for_plot,
+        "n_samples": X_train.shape[0],
         "step2": nn_step2,
         "use_class_weight": use_class_weight,
     }
@@ -368,7 +375,7 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
 
 
 def _plot_nn_step3(results):
-    """LR vs F1 (model complexity) and training loss vs iteration (epoch curve)."""
+    """LR vs F1 (model complexity) and training loss vs epoch (epoch curve)."""
     suffix = _nn_plot_suffix(results.get("use_class_weight", False))
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     ax = axes[0]
@@ -383,8 +390,11 @@ def _plot_nn_step3(results):
     ax.grid(True, alpha=0.3)
 
     ax = axes[1]
-    ax.plot(results["loss_curve"], color="C0", label="Train loss")
-    ax.set_xlabel("Iteration")
+    n_samples = results.get("n_samples", 1)
+    iters_per_epoch = _iterations_per_epoch(n_samples)
+    epochs_x = np.arange(len(results["loss_curve"])) / iters_per_epoch
+    ax.plot(epochs_x, results["loss_curve"], color="C0", label="Train loss")
+    ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
     ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)")
     ax.legend()
@@ -492,6 +502,9 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
 
     # 5) Write everything to NN_sklearn_results.txt
     n_iter_used = clf_final.n_iter_ if hasattr(clf_final, 'n_iter_') else None
+    iters_per_epoch = _iterations_per_epoch(n_samples)
+    n_epochs_used = int(round(n_iter_used / iters_per_epoch)) if n_iter_used is not None else None
+    max_epochs = int(max_iter / iters_per_epoch)
     _write_step4_results(
         cm=cm,
         test_accuracy=test_accuracy,
@@ -503,8 +516,8 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
         learning_curve_train=train_scores_mean.tolist(),
         learning_curve_val=val_scores_mean.tolist(),
         use_class_weight=use_class_weight,
-        n_iter_used=n_iter_used,
-        max_iter=max_iter,
+        n_epochs_used=n_epochs_used,
+        max_epochs=max_epochs,
     )
     print("Step 4 done. Test F1:", round(test_f1, 4), "| Fit time:", round(fit_time, 3), "s")
     return {
@@ -572,8 +585,8 @@ def _write_step4_results(
     learning_curve_train,
     learning_curve_val,
     use_class_weight=False,
-    n_iter_used=None,
-    max_iter=None,
+    n_epochs_used=None,
+    max_epochs=None,
 ):
     """Append Step 4 results to NN_sklearn_results.txt."""
     path = _nn_results_path(use_class_weight)
@@ -598,12 +611,12 @@ def _write_step4_results(
         f"  Fit time: {fit_time:.4f} s",
         f"  Predict time: {predict_time:.4f} s",
     ]
-    if n_iter_used is not None and max_iter is not None:
+    if n_epochs_used is not None and max_epochs is not None:
         lines.extend([
             "",
             "Training details:",
-            f"  Iterations used: {n_iter_used} / {max_iter}",
-            f"  Early stopping: {'Yes' if n_iter_used < max_iter else 'No'}",
+            f"  Epochs used: {n_epochs_used} / {max_epochs}",
+            f"  Early stopping: {'Yes' if n_epochs_used < max_epochs else 'No'}",
         ])
     lines.append("")
     _append_nn_results("\n".join(lines), path=path)
