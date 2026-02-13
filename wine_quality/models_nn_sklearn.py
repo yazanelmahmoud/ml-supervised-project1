@@ -391,7 +391,6 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
 def _plot_nn_step3(results):
     """LR vs Macro-F1 (model complexity) and training loss vs iteration (epoch curve)."""
     suffix = _nn_plot_suffix(results.get("use_class_weight", False))
-    title_suffix = " (class_weight=balanced)" if results.get("use_class_weight") else ""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     ax = axes[0]
     ax.plot(results["lr_values"], results["train_f1_macro"], "o-", label="Train Macro-F1 (mean CV)")
@@ -400,7 +399,7 @@ def _plot_nn_step3(results):
     ax.set_xlabel("Learning rate")
     ax.set_ylabel("Macro-F1")
     ax.set_xscale("log")
-    ax.set_title("NN Step 3 — Model Complexity (LR)" + title_suffix)
+    ax.set_title("NN Step 3 — Model Complexity (LR)")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -408,7 +407,7 @@ def _plot_nn_step3(results):
     ax.plot(results["loss_curve"], color="C0", label="Train loss")
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Loss")
-    ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)" + title_suffix)
+    ax.set_title("NN Step 3 — Epoch curve (train loss, best LR)")
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()

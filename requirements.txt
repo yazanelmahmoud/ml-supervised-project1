@@ -10,10 +10,10 @@ seaborn>=0.12.0
 # Utilities
 tqdm>=4.62.0
 
-# PyTorch (optional, for models_nn_pytorch when implemented)
-# Uncomment and adjust for your platform: https://pytorch.org/get-started/locally/
-# torch>=1.10.0
-# torchvision  # if needed
+# PyTorch (for models_nn_pytorch)
+# Install via: pip install torch
+# Or for CPU-only: pip install torch
+torch>=1.10.0
 
 # Jupyter (for running project1_results.ipynb)
 jupyter>=1.0.0
