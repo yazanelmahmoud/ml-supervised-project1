@@ -1,0 +1,36 @@
+============================================================
+BASELINE MODELS — Wine Quality (multiclass classification)
+CV = 5-fold stratified on train; Test = held-out test set.
+============================================================
+
+--- DummyClassifier ---
+Hyperparameters: strategy='stratified', random_state=42
+CV (train): Accuracy=0.2531, Macro-F1=0.1286
+Test:       Accuracy=0.2415, Macro-F1=0.1255
+
+--- DecisionTree ---
+Hyperparameters: max_depth=10, random_state=42
+CV (train): Accuracy=0.5047, Macro-F1=0.3269
+Test:       Accuracy=0.4803, Macro-F1=0.3174
+
+--- SVM (linear) ---
+Hyperparameters: LinearSVC, max_iter=2000, random_state=42
+CV (train): Accuracy=0.5242, Macro-F1=0.2546
+Test:       Accuracy=0.5056, Macro-F1=0.2416
+
+--- SVM (RBF) ---
+Hyperparameters: kernel='rbf', max_iter=2000, random_state=42
+CV (train): Accuracy=0.5681, Macro-F1=0.3129
+Test:       Accuracy=0.5376, Macro-F1=0.3202
+
+--- NN (sklearn) ---
+Hyperparameters: hidden_layer_sizes=(10,), solver='sgd', momentum=0, max_iter=500, random_state=42
+CV (train): Accuracy=0.5176, Macro-F1=0.2611
+Test:       Accuracy=0.5169, Macro-F1=0.2545
+
+--- NN (PyTorch) ---
+Hyperparameters: 1 hidden layer, 10 neurons, SGD lr=0.01 momentum=0, 100 epochs, batch_size=64
+CV (train): Accuracy=0.5484, Macro-F1=0.2926
+Test:       Accuracy=0.5404, Macro-F1=0.3118
+
+============================================================

@@ -1,0 +1,36 @@
+============================================================
+BASELINE MODELS — Adult Income (binary classification)
+CV = 5-fold stratified on train; Test = held-out test set.
+============================================================
+
+--- DummyClassifier ---
+Hyperparameters: strategy='stratified', random_state=42
+CV (train): Accuracy=0.6294, F1=0.2507, PR-AUC=0.2489
+Test:       Accuracy=0.6351, F1=0.2522, PR-AUC=0.2500
+
+--- DecisionTree ---
+Hyperparameters: max_depth=10, random_state=42
+CV (train): Accuracy=0.8535, F1=0.6661, PR-AUC=0.7577
+Test:       Accuracy=0.8548, F1=0.6690, PR-AUC=0.7677
+
+--- SVM (linear) ---
+Hyperparameters: LinearSVC, max_iter=2000, random_state=42
+CV (train): Accuracy=0.8424, F1=0.6499, PR-AUC=N/A
+Test:       Accuracy=0.8412, F1=0.6435, PR-AUC=N/A
+
+--- SVM (RBF) ---
+Hyperparameters: kernel='rbf', max_iter=2000, train_subsample=5000, random_state=42
+CV (train): Accuracy=0.8404, F1=0.6344, PR-AUC=0.7422
+Test:       Accuracy=0.8467, F1=0.6489, PR-AUC=0.7520
+
+--- NN (sklearn) ---
+Hyperparameters: hidden_layer_sizes=(10,), solver='sgd', momentum=0, max_iter=500, random_state=42
+CV (train): Accuracy=0.8369, F1=0.6417, PR-AUC=0.7309
+Test:       Accuracy=0.8339, F1=0.6333, PR-AUC=0.7273
+
+--- NN (PyTorch) ---
+Hyperparameters: 1 hidden layer, 10 neurons, SGD lr=0.01 momentum=0, 100 epochs, batch_size=64
+CV (train): Accuracy=0.8457, F1=0.6641, PR-AUC=N/A
+Test:       Accuracy=0.8474, F1=0.6683, PR-AUC=N/A
+
+============================================================
