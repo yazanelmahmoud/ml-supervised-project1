@@ -52,3 +52,7 @@ Runtime:
   Fit time: 0.1365 s
   Predict time: 0.0004 s
   Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
+
+Training details:
+  Iterations used: 13 / 6700
+  Early stopping: Yes

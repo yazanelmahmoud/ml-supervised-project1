@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, average_precision_score
 from sklearn.utils.class_weight import compute_class_weight
+from joblib import Parallel, delayed
+from collections import defaultdict
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -31,6 +33,7 @@ BATCH_SIZE = 64
 MAX_EPOCHS = 100
 EARLY_STOPPING_PATIENCE = 10
 CV_SPLITS = 5
+N_JOBS = -1  # Use all CPU cores for parallel CV
 
 torch.manual_seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
@@ -106,6 +109,85 @@ def _fit_one_fold(X_tr, y_tr, X_val, y_val, arch, lr, max_epochs, class_weight_t
     return train_f1, best_val_f1, loss_curve
 
 
+def _fit_one_fold_width(w, max_epochs, train_idx, val_idx, X_train, y_train, class_weight):
+    """Fit one (width, fold); return (train_f1, val_f1). Picklable for joblib."""
+    # Set device per worker (CPU for parallelization)
+    device = torch.device("cpu")
+    # Recreate class_weight_tensor on worker device
+    class_weight_tensor = torch.FloatTensor(class_weight).to(device)
+    # Set seed per worker for reproducibility
+    torch.manual_seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+    
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    
+    tr_f1, v_f1, _ = _fit_one_fold(
+        X_tr, y_tr, X_val, y_val,
+        (w,), 0.01, max_epochs, class_weight_tensor, device
+    )
+    return (tr_f1, v_f1)
+
+
+def _fit_one_fold_arch(arch, max_epochs, train_idx, val_idx, X_train, y_train, class_weight):
+    """Fit one (arch, fold); return (train_f1, val_f1). Picklable for joblib."""
+    device = torch.device("cpu")
+    class_weight_tensor = torch.FloatTensor(class_weight).to(device)
+    torch.manual_seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+    
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    
+    tr_f1, v_f1, _ = _fit_one_fold(
+        X_tr, y_tr, X_val, y_val,
+        arch, 0.01, max_epochs, class_weight_tensor, device
+    )
+    return (tr_f1, v_f1)
+
+
+def _fit_one_fold_lr(arch, lr, max_epochs, train_idx, val_idx, X_train, y_train, class_weight):
+    """Fit one (lr, fold); return (train_f1, val_f1). Picklable for joblib."""
+    device = torch.device("cpu")
+    class_weight_tensor = torch.FloatTensor(class_weight).to(device)
+    torch.manual_seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+    
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    
+    tr_f1, v_f1, _ = _fit_one_fold(
+        X_tr, y_tr, X_val, y_val,
+        arch, lr, max_epochs, class_weight_tensor, device
+    )
+    return (tr_f1, v_f1)
+
+
+def _fit_one_fold_lc(arch, lr, max_epochs, train_idx, val_idx, X_train, y_train, class_weight):
+    """Fit one fold for learning curve; return (train_f1, val_f1). Picklable for joblib."""
+    device = torch.device("cpu")
+    class_weight_tensor = torch.FloatTensor(class_weight).to(device)
+    torch.manual_seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+    
+    X_tr = X_train[train_idx]
+    X_val = X_train[val_idx]
+    y_tr = y_train[train_idx]
+    y_val = y_train[val_idx]
+    
+    tr_f1, v_f1, _ = _fit_one_fold(
+        X_tr, y_tr, X_val, y_val,
+        arch, lr, max_epochs, class_weight_tensor, device
+    )
+    return (tr_f1, v_f1)
+
+
 def _append_results(text, path=NN_PYTORCH_RESULTS_PATH):
     with open(path, "a", encoding="utf-8") as f:
         f.write(text if text.endswith("\n") else text + "\n")
@@ -127,19 +209,29 @@ def run_nn_step1(X_train, y_train, X_test, y_test, cv=CV_SPLITS):
     n_samples = X_train.shape[0]
     max_epochs = min(500, max(100, n_samples // BATCH_SIZE * 100))
 
-    train_f1_list, cv_f1_list = [], []
-    for w in tqdm(WIDTH_VALUES, desc="NN Step1 width"):
-        train_f1s, val_f1s = [], []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            tr_f1, v_f1, _ = _fit_one_fold(
-                X_train[train_idx], y_train[train_idx],
-                X_train[val_idx], y_train[val_idx],
-                (w,), 0.01, max_epochs, class_weight_tensor, device
-            )
-            train_f1s.append(tr_f1)
-            val_f1s.append(v_f1)
-        train_f1_list.append(float(np.mean(train_f1s)))
-        cv_f1_list.append(float(np.mean(val_f1s)))
+    # Parallelize CV folds across widths
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (w, max_epochs, train_idx, val_idx)
+        for w in WIDTH_VALUES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_width)(w, max_epochs, train_idx, val_idx, X_train, y_train, class_weight)
+        for w, max_epochs, train_idx, val_idx in tqdm(tasks, desc="NN Step1 width", total=len(tasks))
+    )
+    # Aggregate by width (same order as WIDTH_VALUES)
+    by_width = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for w in WIDTH_VALUES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_width[w]["train"].append(train_f1)
+            by_width[w]["val"].append(val_f1)
+            idx += 1
+    
+    train_f1_list = [float(np.mean(by_width[w]["train"])) for w in WIDTH_VALUES]
+    cv_f1_list = [float(np.mean(by_width[w]["val"])) for w in WIDTH_VALUES]
 
     best_width = WIDTH_VALUES[int(np.argmax(cv_f1_list))]
     results = {"widths": WIDTH_VALUES, "train_f1": train_f1_list, "cv_f1": cv_f1_list, "best_width": best_width}
@@ -189,20 +281,30 @@ def run_nn_step2(X_train, y_train, X_test, y_test, nn_step1, cv=CV_SPLITS):
     n_samples = X_train.shape[0]
     max_epochs = min(500, max(100, n_samples // BATCH_SIZE * 100))
 
-    train_f1_list, cv_f1_list = [], []
+    # Parallelize CV folds across architectures
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (arch, max_epochs, train_idx, val_idx)
+        for arch in STEP2_ARCHITECTURES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_arch)(arch, max_epochs, train_idx, val_idx, X_train, y_train, class_weight)
+        for arch, max_epochs, train_idx, val_idx in tqdm(tasks, desc="NN Step2 depth", total=len(tasks))
+    )
+    # Aggregate by architecture
+    by_arch = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for arch in STEP2_ARCHITECTURES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_arch[arch]["train"].append(train_f1)
+            by_arch[arch]["val"].append(val_f1)
+            idx += 1
+    
     n_layers_list = [len(a) for a in STEP2_ARCHITECTURES]
-    for arch in tqdm(STEP2_ARCHITECTURES, desc="NN Step2 depth"):
-        train_f1s, val_f1s = [], []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            tr_f1, v_f1, _ = _fit_one_fold(
-                X_train[train_idx], y_train[train_idx],
-                X_train[val_idx], y_train[val_idx],
-                arch, 0.01, max_epochs, class_weight_tensor, device
-            )
-            train_f1s.append(tr_f1)
-            val_f1s.append(v_f1)
-        train_f1_list.append(float(np.mean(train_f1s)))
-        cv_f1_list.append(float(np.mean(val_f1s)))
+    train_f1_list = [float(np.mean(by_arch[arch]["train"])) for arch in STEP2_ARCHITECTURES]
+    cv_f1_list = [float(np.mean(by_arch[arch]["val"])) for arch in STEP2_ARCHITECTURES]
 
     best_idx = int(np.argmax(cv_f1_list))
     best_architecture = STEP2_ARCHITECTURES[best_idx]
@@ -261,19 +363,29 @@ def run_nn_step3(X_train, y_train, X_test, y_test, nn_step2, cv=CV_SPLITS):
     n_samples = X_train.shape[0]
     max_epochs = min(500, max(100, n_samples // BATCH_SIZE * 100))
 
-    train_f1_list, cv_f1_list = [], []
-    for lr in tqdm(STEP3_LR_VALUES, desc="NN Step3 LR"):
-        train_f1s, val_f1s = [], []
-        for train_idx, val_idx in cv_splitter.split(X_train, y_train):
-            tr_f1, v_f1, _ = _fit_one_fold(
-                X_train[train_idx], y_train[train_idx],
-                X_train[val_idx], y_train[val_idx],
-                best_arch, lr, max_epochs, class_weight_tensor, device
-            )
-            train_f1s.append(tr_f1)
-            val_f1s.append(v_f1)
-        train_f1_list.append(float(np.mean(train_f1s)))
-        cv_f1_list.append(float(np.mean(val_f1s)))
+    # Parallelize CV folds across learning rates
+    folds_list = list(cv_splitter.split(X_train, y_train))
+    tasks = [
+        (best_arch, lr, max_epochs, train_idx, val_idx)
+        for lr in STEP3_LR_VALUES
+        for train_idx, val_idx in folds_list
+    ]
+    results = Parallel(n_jobs=N_JOBS)(
+        delayed(_fit_one_fold_lr)(best_arch, lr, max_epochs, train_idx, val_idx, X_train, y_train, class_weight)
+        for best_arch, lr, max_epochs, train_idx, val_idx in tqdm(tasks, desc="NN Step3 LR", total=len(tasks))
+    )
+    # Aggregate by learning rate
+    by_lr = defaultdict(lambda: {"train": [], "val": []})
+    idx = 0
+    for lr in STEP3_LR_VALUES:
+        for _ in folds_list:
+            train_f1, val_f1 = results[idx]
+            by_lr[lr]["train"].append(train_f1)
+            by_lr[lr]["val"].append(val_f1)
+            idx += 1
+    
+    train_f1_list = [float(np.mean(by_lr[lr]["train"])) for lr in STEP3_LR_VALUES]
+    cv_f1_list = [float(np.mean(by_lr[lr]["val"])) for lr in STEP3_LR_VALUES]
 
     best_idx = int(np.argmax(cv_f1_list))
     best_lr = STEP3_LR_VALUES[best_idx]
@@ -331,8 +443,10 @@ def _write_step3_results(results):
         f"Mean CV F1:    {[round(x, 4) for x in results['cv_f1']]}",
         f"Best LR: {results['best_lr']}",
         "========== NN (PyTorch) Best model ==========",
-        f"Best architecture: {list(results['best_architecture'])}",
-        f"Best learning rate: {results['best_lr']}", "",
+        f"Best architecture (from Step 2): {list(results['best_architecture'])}",
+        f"Best learning rate (from Step 3): {results['best_lr']}",
+        f"Fixed: L2={NN_L2}, batch_size={BATCH_SIZE}, early_stopping_patience={EARLY_STOPPING_PATIENCE}",
+        "",
     ]
     _append_results("\n".join(lines))
 
@@ -362,21 +476,26 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
         n_use = max(1, int(n_samples * frac))
         idx = np.random.RandomState(RANDOM_SEED).permutation(n_samples)[:n_use]
         X_sub, y_sub = X_train[idx], y_train[idx]
-        tr_f1s, v_f1s = [], []
-        for train_idx, val_idx in cv_splitter.split(X_sub, y_sub):
-            tr_f1, v_f1, _ = _fit_one_fold(
-                X_sub[train_idx], y_sub[train_idx],
-                X_sub[val_idx], y_sub[val_idx],
-                best_arch, best_lr, max_epochs, class_weight_tensor, device
-            )
-            tr_f1s.append(tr_f1)
-            v_f1s.append(v_f1)
+        
+        # Parallelize CV folds for this training size
+        folds_list = list(cv_splitter.split(X_sub, y_sub))
+        tasks = [
+            (train_idx, val_idx)
+            for train_idx, val_idx in folds_list
+        ]
+        results = Parallel(n_jobs=N_JOBS)(
+            delayed(_fit_one_fold_lc)(best_arch, best_lr, max_epochs, train_idx, val_idx, X_sub, y_sub, class_weight)
+            for train_idx, val_idx in tasks
+        )
+        tr_f1s = [r[0] for r in results]
+        v_f1s = [r[1] for r in results]
+        
         train_sizes_abs.append(n_use)
         train_scores.append(np.mean(tr_f1s))
         val_scores.append(np.mean(v_f1s))
     _plot_learning_curve(np.array(train_sizes_abs), np.array(train_scores), np.array(val_scores))
 
-    # Final model
+    # Final model - with early stopping
     n_features = X_train.shape[1]
     model = MLP(n_features, best_arch, output_size=2).to(device)
     opt = torch.optim.SGD(model.parameters(), lr=best_lr, momentum=0.0, weight_decay=NN_L2)
@@ -384,14 +503,33 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     ds = TensorDataset(torch.FloatTensor(X_train).to(device), torch.LongTensor(y_train).to(device))
     loader = DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True)
 
+    # Early stopping for final model (similar to sklearn's tol-based stopping)
+    best_loss = float('inf')
+    patience_counter = 0
+    tol = 1e-4  # Same tolerance as sklearn default
+    n_epochs_used = 0
+    
     t0 = time.perf_counter()
     for epoch in range(max_epochs):
         model.train()
+        epoch_loss = 0.0
         for xb, yb in loader:
             opt.zero_grad()
             loss = criterion(model(xb), yb)
             loss.backward()
             opt.step()
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(loader)
+        n_epochs_used = epoch + 1
+        
+        # Early stopping: stop if loss doesn't improve by tol for patience epochs
+        if avg_loss < best_loss - tol:
+            best_loss = avg_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
+                break
     fit_time = time.perf_counter() - t0
 
     model.eval()
@@ -412,6 +550,7 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
     _write_step4_results(
         cm, test_accuracy, test_f1, test_pr_auc, fit_time, predict_time,
         train_sizes_abs, train_scores, val_scores,
+        n_epochs_used, max_epochs,
     )
     print("Step 4 done. Test F1:", round(test_f1, 4), "| Fit time:", round(fit_time, 3), "s")
     return {
@@ -463,18 +602,34 @@ def _plot_confusion_matrix(cm, y_test, y_pred):
 
 
 def _write_step4_results(cm, test_accuracy, test_f1, test_pr_auc, fit_time, predict_time,
-                         learning_curve_sizes, learning_curve_train, learning_curve_val):
+                         learning_curve_sizes, learning_curve_train, learning_curve_val,
+                         n_epochs_used=None, max_epochs=None):
     lines = [
         "", "========== NN (PyTorch) Step 4 — Final model (test set) ==========",
+        "",
         "Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):",
         f"  Train sizes: {[int(x) for x in learning_curve_sizes]}",
         f"  Train F1 (mean CV): {[round(x, 4) for x in learning_curve_train]}",
         f"  Validation F1 (mean CV): {[round(x, 4) for x in learning_curve_val]}",
-        "", "Test set metrics:",
+        "",
+        "Test set metrics:",
         f"  Accuracy: {test_accuracy:.4f}",
         f"  F1: {test_f1:.4f}",
-        f"  PR-AUC: {test_pr_auc:.4f}",
-        "", f"Confusion matrix: {cm.tolist()}",
-        "", f"Fit time: {fit_time:.4f} s", f"Predict time: {predict_time:.4f} s", "",
+        f"  PR-AUC (average_precision): {test_pr_auc:.4f}",
+        "",
+        "Confusion matrix (test set):",
+        f"  {cm.tolist()}",
+        "",
+        "Runtime:",
+        f"  Fit time: {fit_time:.4f} s",
+        f"  Predict time: {predict_time:.4f} s",
     ]
+    if n_epochs_used is not None and max_epochs is not None:
+        lines.extend([
+            "",
+            "Training details:",
+            f"  Epochs used: {n_epochs_used} / {max_epochs}",
+            f"  Early stopping: {'Yes' if n_epochs_used < max_epochs else 'No'}",
+        ])
+    lines.append("")
     _append_results("\n".join(lines))

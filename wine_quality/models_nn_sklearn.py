@@ -505,6 +505,7 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
 
     metrics = score_multiclass(y_test, y_pred, y_proba)
 
+    n_iter_used = clf_final.n_iter_ if hasattr(clf_final, 'n_iter_') else None
     _write_step4_results(
         cm=cm,
         metrics=metrics,
@@ -514,6 +515,8 @@ def run_nn_step4(X_train, y_train, X_test, y_test, nn_step3, cv=CV_SPLITS):
         learning_curve_train=train_scores_mean.tolist(),
         learning_curve_val=val_scores_mean.tolist(),
         use_class_weight=use_class_weight,
+        n_iter_used=n_iter_used,
+        max_iter=max_iter,
     )
     print("Step 4 done. Test Macro-F1:", round(metrics['f1_macro'], 4), "| Fit time:", round(fit_time, 3), "s")
     return {
@@ -569,6 +572,8 @@ def _write_step4_results(
     learning_curve_train,
     learning_curve_val,
     use_class_weight=False,
+    n_iter_used=None,
+    max_iter=None,
 ):
     """Append Step 4 results to NN_sklearn_results.txt."""
     path = _nn_results_path(use_class_weight)
@@ -608,8 +613,15 @@ def _write_step4_results(
         f"  Fit time: {fit_time:.4f} s",
         f"  Predict time: {predict_time:.4f} s",
         f"  Hardware: {_get_hardware_note()}",
-        "",
     ])
+    if n_iter_used is not None and max_iter is not None:
+        lines.extend([
+            "",
+            "Training details:",
+            f"  Iterations used: {n_iter_used} / {max_iter}",
+            f"  Early stopping: {'Yes' if n_iter_used < max_iter else 'No'}",
+        ])
+    lines.append("")
     _append_nn_results("\n".join(lines), path=path)
 
 

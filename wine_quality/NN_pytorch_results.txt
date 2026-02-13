@@ -1,7 +1,56 @@
-================================================================================
-  NEURAL NETWORKS (PYTORCH) — RESULTS (WINE QUALITY)
-================================================================================
+NN (PyTorch) pipeline results — Wine Quality [class_weight=balanced]
+============================================================
 
-TODO: PyTorch NN results will be saved here when running models_nn_pytorch.py
 
-================================================================================
+========== NN (PyTorch) Step 1 — Width search ==========
+Widths: [8, 16, 32, 64, 128, 200, 400, 700]
+Mean train Macro-F1: [0.3654, 0.3765, 0.3833, 0.3712, 0.4135, 0.3912, 0.4035, 0.3959]
+Mean CV Macro-F1:    [0.3429, 0.3431, 0.3399, 0.3281, 0.3476, 0.3362, 0.3502, 0.3512]
+Best width: 700
+========== NN (PyTorch) Step 2 — Depth vs width ==========
+Architectures: [[64], [32, 14], [28, 14, 8]]
+Mean train Macro-F1: [0.3712, 0.3771, 0.2299]
+Mean CV Macro-F1:    [0.3281, 0.3549, 0.2557]
+Best architecture: [32, 14]
+========== NN (PyTorch) Step 3 — Learning rate sweep ==========
+LR values: [0.1, 0.01, 0.001, 0.0003]
+Mean train Macro-F1: [0.4201, 0.3771, 0.0914, 0.0877]
+Mean CV Macro-F1:    [0.3714, 0.3549, 0.0912, 0.0812]
+Best LR: 0.1
+========== NN (PyTorch) Best model ==========
+Best architecture (from Step 2): [32, 14]
+Best learning rate (from Step 3): 0.1
+Fixed: L2=0.0001, batch_size=64, early_stopping_patience=10
+
+========== NN (PyTorch) Step 4 — Final model (test set) ==========
+
+Learning curve (train sizes 10%, 25%, 50%, 75%, 100%):
+  Train sizes: [425, 1064, 2128, 3192, 4256]
+  Train Macro-F1 (mean CV): [0.4592, 0.413, 0.4405, 0.4221, 0.3768]
+  Validation Macro-F1 (mean CV): [0.3513, 0.3445, 0.3657, 0.3775, 0.3664]
+
+Test set metrics:
+  Accuracy: 0.4455
+  Macro-F1: 0.3167
+  Weighted-F1: 0.4533
+
+--- Per-class performance ---
+  Quality 1: F1 = 0.0000, Accuracy = 0.0000
+  Quality 2: F1 = 0.1805, Accuracy = 0.3871
+  Quality 3: F1 = 0.4865, Accuracy = 0.4937
+  Quality 4: F1 = 0.4463, Accuracy = 0.3560
+  Quality 5: F1 = 0.5514, Accuracy = 0.6364
+  Quality 6: F1 = 0.3175, Accuracy = 0.2256
+  Quality 7: F1 = 0.4400, Accuracy = 0.6471
+  Quality 8: F1 = 0.1111, Accuracy = 0.2500
+
+Confusion matrix (test set):
+  [[0, 2, 0, 1, 1, 0, 0, 0], [6, 12, 10, 3, 0, 0, 0, 0], [9, 49, 117, 50, 12, 0, 0, 0], [7, 26, 100, 131, 99, 3, 2, 0], [7, 11, 14, 31, 161, 17, 9, 3], [3, 2, 3, 3, 57, 30, 30, 5], [0, 0, 0, 0, 1, 6, 22, 5], [0, 0, 0, 0, 0, 0, 3, 1]]
+
+Runtime:
+  Fit time: 4.0974 s
+  Predict time: 0.0003 s
+
+Training details:
+  Epochs used: 97 / 500
+  Early stopping: Yes
