@@ -34,3 +34,7 @@ CV (train): Accuracy=0.8457, F1=0.6641, PR-AUC=N/A
 Test:       Accuracy=0.8474, F1=0.6683, PR-AUC=N/A
 
 ============================================================
+--- kNN ---
+Hyperparameters: n_neighbors=5, weights='uniform'
+CV (train): Accuracy=0.8289, F1=0.6414, PR-AUC=0.6460
+Test:       Accuracy=0.8266, F1=0.6279, PR-AUC=0.6446

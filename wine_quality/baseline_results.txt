@@ -34,3 +34,7 @@ CV (train): Accuracy=0.5484, Macro-F1=0.2926
 Test:       Accuracy=0.5404, Macro-F1=0.3118
 
 ============================================================
+--- kNN ---
+Hyperparameters: n_neighbors=5, weights='uniform'
+CV (train): Accuracy=0.5162, Macro-F1=0.3404
+Test:       Accuracy=0.5094, Macro-F1=0.3289

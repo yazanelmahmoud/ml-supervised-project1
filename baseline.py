@@ -9,6 +9,7 @@ import sys
 import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC, LinearSVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
@@ -120,6 +121,19 @@ def run_baselines(output_path=None):
     lines.append("Test:       Accuracy=%.4f, F1=%.4f, PR-AUC=%.4f" % (acc_t, f1_t, pr_auc_t))
     print(lines[-4] + "\n" + lines[-3] + "\n" + lines[-2] + "\n" + lines[-1])
 
+    # kNN
+    m = KNeighborsClassifier(n_neighbors=5, weights="uniform")
+    res = cross_validate(m, X_train, y_train, cv=cv, scoring=scoring, n_jobs=1)
+    m.fit(X_train, y_train)
+    pred = m.predict(X_test)
+    acc_t, f1_t = accuracy_score(y_test_np, pred), f1_score(y_test_np, pred, zero_division=0)
+    pr_auc_t = average_precision_score(y_test_np, m.predict_proba(X_test)[:, 1])
+    lines.append("\n--- kNN ---")
+    lines.append("Hyperparameters: n_neighbors=5, weights='uniform'")
+    lines.append("CV (train): Accuracy=%.4f, F1=%.4f, PR-AUC=%.4f" % (res["test_accuracy"].mean(), res["test_f1"].mean(), res["test_average_precision"].mean()))
+    lines.append("Test:       Accuracy=%.4f, F1=%.4f, PR-AUC=%.4f" % (acc_t, f1_t, pr_auc_t))
+    print(lines[-4] + "\n" + lines[-3] + "\n" + lines[-2] + "\n" + lines[-1])
+
     # SVM linear (LinearSVC — no predict_proba, so no PR-AUC in CV)
     m = LinearSVC(max_iter=2000, random_state=RANDOM_SEED)
     scoring_linear = {"accuracy": "accuracy", "f1": "f1"}
@@ -180,4 +194,34 @@ def run_baselines(output_path=None):
     with open(output_path, "w") as f:
         f.write(text)
     print("\nResults written to:", output_path)
+    return text
+
+
+def run_baseline_knn(append_to_file=True, output_path=None):
+    """Run only the kNN baseline (CV + test) and optionally append results to baseline_results.txt."""
+    from preprocessing import get_dataset
+    set_seed()
+    output_path = output_path or os.path.join(os.path.dirname(__file__), "baseline_results.txt")
+    X_train, y_train, X_test, y_test = get_dataset()
+    y_test_np = y_test.values if hasattr(y_test, "values") else y_test
+    cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+    scoring = {"accuracy": "accuracy", "f1": "f1", "average_precision": "average_precision"}
+    m = KNeighborsClassifier(n_neighbors=5, weights="uniform")
+    res = cross_validate(m, X_train, y_train, cv=cv, scoring=scoring, n_jobs=1)
+    m.fit(X_train, y_train)
+    pred = m.predict(X_test)
+    acc_t, f1_t = accuracy_score(y_test_np, pred), f1_score(y_test_np, pred, zero_division=0)
+    pr_auc_t = average_precision_score(y_test_np, m.predict_proba(X_test)[:, 1])
+    lines = [
+        "\n--- kNN ---",
+        "Hyperparameters: n_neighbors=5, weights='uniform'",
+        "CV (train): Accuracy=%.4f, F1=%.4f, PR-AUC=%.4f" % (res["test_accuracy"].mean(), res["test_f1"].mean(), res["test_average_precision"].mean()),
+        "Test:       Accuracy=%.4f, F1=%.4f, PR-AUC=%.4f" % (acc_t, f1_t, pr_auc_t),
+    ]
+    text = "\n".join(lines)
+    print(text)
+    if append_to_file:
+        with open(output_path, "a") as f:
+            f.write(text + "\n")
+        print("Appended to", output_path)
     return text
