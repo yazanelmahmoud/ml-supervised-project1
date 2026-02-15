@@ -27,8 +27,8 @@ best_config (from Step 1): {'kernel': 'rbf', 'C': 10, 'gamma': 0.053399}
 Accuracy: 0.8525
 F1: 0.6657
 PR-AUC: 0.7721
-Fit (sec): 116.1010
-Predict (sec): 9.9915
+Fit (sec): 116.5888
+Predict (sec): 10.2033
 Hardware: Linux 6.14.0-1018-aws, CPU: x86_64
 Confusion matrix (0=<=50K, 1=>50K): [[6375, 420], [913, 1327]]
 
