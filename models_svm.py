@@ -35,10 +35,10 @@ def _svm_plot_suffix(class_weight):
 C_VALUES = [1e-3, 0.01, 0.1, 1, 10, 100]  # 10^(-3) through 100
 C_REF = 1  # reference C for table
 
-# SVC(kernel='linear') uses libsvm and can hit max_iter on large data; use -1 so it converges
-# (baseline uses LinearSVC which converges with 2000; unconverged SVC gives artificially bad CV and wrong "best" C)
+# SVC (libsvm) can hit max_iter on large data; use -1 so it converges. Same for linear and RBF.
+# (baseline uses LinearSVC which converges; unconverged SVC gives artificially bad CV and wrong "best" config.)
 SVC_LINEAR_MAX_ITER = -1
-SVC_RBF_MAX_ITER = 3000
+SVC_RBF_MAX_ITER = -1
 
 
 def _rbf_gammas_around_scale(X_train):
