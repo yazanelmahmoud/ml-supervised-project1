@@ -35,6 +35,11 @@ def _svm_plot_suffix(class_weight):
 C_VALUES = [1e-3, 0.01, 0.1, 1, 10, 100]  # 10^(-3) through 100
 C_REF = 1  # reference C for table
 
+# SVC(kernel='linear') uses libsvm and can hit max_iter on large data; use -1 so it converges
+# (baseline uses LinearSVC which converges with 2000; unconverged SVC gives artificially bad CV and wrong "best" C)
+SVC_LINEAR_MAX_ITER = -1
+SVC_RBF_MAX_ITER = 3000
+
 
 def _rbf_gammas_around_scale(X_train):
     """RBF gammas: 'scale' plus values around it. Sklearn uses scale = 1/(n_features * X.var())."""
@@ -57,6 +62,8 @@ def run_svm_step1(X_train, y_train, X_test, y_test, cv=5, class_weight=None):
     SVM model-complexity: linear and RBF kernels, CV F1 vs C (and gamma for RBF).
     Two panels: Linear (C vs F1) | RBF (C vs F1 for gamma=scale and gammas around scale).
     class_weight: None (default) or 'balanced'.
+    Note: linear uses max_iter=-1 so SVC converges (baseline uses LinearSVC which converges;
+    unconverged SVC(linear) would pick a spuriously "best" small C and underperform baseline).
     """
     results = {"linear": {}, "rbf": {}, "best_config": None, "best_cv_f1": -1, "class_weight": class_weight}
     np.random.seed(RANDOM_SEED)
@@ -66,7 +73,7 @@ def run_svm_step1(X_train, y_train, X_test, y_test, cv=5, class_weight=None):
     # Linear: CV F1 vs C
     linear_cv_f1 = []
     for c in tqdm(C_VALUES, desc="SVM linear (C)"):
-        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=3000, **cw_kw)
+        clf = SVC(kernel="linear", C=c, random_state=RANDOM_SEED, max_iter=SVC_LINEAR_MAX_ITER, **cw_kw)
         scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1", n_jobs=-1)
         linear_cv_f1.append(float(scores.mean()))
     results["linear"] = {"C_values": list(C_VALUES), "cv_f1": linear_cv_f1}
@@ -83,7 +90,7 @@ def run_svm_step1(X_train, y_train, X_test, y_test, cv=5, class_weight=None):
         key = f"gamma={gamma}"
         cv_f1_list = []
         for c in C_VALUES:
-            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=3000, **cw_kw)
+            clf = SVC(kernel="rbf", C=c, gamma=gamma, random_state=RANDOM_SEED, max_iter=SVC_RBF_MAX_ITER, **cw_kw)
             scores = cross_val_score(clf, X_train, y_train, cv=cv_splitter, scoring="f1", n_jobs=-1)
             cv_f1_list.append(float(scores.mean()))
         rbf_curves[key] = cv_f1_list
@@ -183,12 +190,12 @@ def run_svm_learning_curves(X_train, y_train, X_test, y_test, best_config=None, 
 
     lc_sizes = lc_train_b = lc_val_b = lc_train_t = lc_val_t = None
     if best_config["kernel"] == "linear":
-        clf_tuned = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, **cw_kw)
+        clf_tuned = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=SVC_LINEAR_MAX_ITER, **cw_kw)
     else:
         clf_tuned = SVC(kernel="rbf", C=best_config["C"], gamma=best_config["gamma"],
-                        random_state=RANDOM_SEED, max_iter=3000, **cw_kw)
+                        random_state=RANDOM_SEED, max_iter=SVC_RBF_MAX_ITER, **cw_kw)
     configs = [
-        ("baseline", SVC(kernel="linear", C=0.1, random_state=RANDOM_SEED, max_iter=3000, **cw_kw)),
+        ("baseline", SVC(kernel="linear", C=0.1, random_state=RANDOM_SEED, max_iter=SVC_LINEAR_MAX_ITER, **cw_kw)),
         ("tuned", clf_tuned),
     ]
     for label, clf in tqdm(configs, desc="SVM learning curves"):
@@ -293,11 +300,11 @@ def run_svm_test_eval(X_train, y_train, X_test, y_test, best_config=None, class_
     np.random.seed(RANDOM_SEED)
     cw_kw = {} if class_weight is None else {"class_weight": class_weight}
     if best_config["kernel"] == "linear":
-        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw)
+        clf = SVC(kernel="linear", C=best_config["C"], random_state=RANDOM_SEED, max_iter=SVC_LINEAR_MAX_ITER, probability=True, **cw_kw)
     else:
         clf = SVC(
             kernel="rbf", C=best_config["C"], gamma=best_config["gamma"],
-            random_state=RANDOM_SEED, max_iter=3000, probability=True, **cw_kw
+            random_state=RANDOM_SEED, max_iter=SVC_RBF_MAX_ITER, probability=True, **cw_kw
         )
     t0 = time.perf_counter()
     clf.fit(X_train, y_train)
